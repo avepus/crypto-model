@@ -106,11 +106,13 @@ def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = 
             print('Fetching ',symb,' market data. call #',attempt,sep='')
             df = tryGetDataFrame(symb, exchange, timeFrame, newSince)
             retdf = retdf.append(df)
-        if retdf.loc[includeStamp:,:].empty:
-            print(symb,'data did not include',includeDate,'data not saved.')
-            if attempt >= maxCalls:
-                print('Maximum data retrivals (',maxCalls,') hit.', sep='')
-            continue
+        #Commenting out becuase we wouldn't know at the current time of
+        #evaluation if a currency would be delisted in the future
+        # if retdf.loc[includeStamp:,:].empty:
+        #     print(symb,'data did not include',includeDate,'data not saved.')
+        #     if attempt >= maxCalls:
+        #         print('Maximum data retrivals (',maxCalls,') hit.', sep='')
+        #     continue
         file = fileName + symb + ".csv"
         file = file.replace("/", "")
         file = 'crypto_data\\' + file
@@ -130,4 +132,4 @@ if __name__ == '__main__':
     exchange = getBinanceExchange()
     symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
     print(symbols)
-    getAndSaveData(['VIB/BTC'], exchange, '7/1/18', '10/30/20')
+    getAndSaveData(symbols, exchange, '7/1/18', '10/30/20')
