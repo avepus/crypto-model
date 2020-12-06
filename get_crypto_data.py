@@ -88,8 +88,6 @@ def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = 
         since (str) -- string representation of start date timeframe
         includeDate (str) -- date that must be in returned data
         fileName (str) -- beginning of the file name
-        timeFrame (str) -- timeframe to pull
-        maxCalls (int) -- max number of data pulls for a given currency
     """
     since = timestampToUTCMs(getUTCTimeStamp(since))
     includeStamp = timestampToUTCMs(getUTCTimeStamp(includeDate))
@@ -118,7 +116,7 @@ def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = 
         #     continue
         file = fileName + symb + ".csv"
         file = file.replace("/", "")
-        file = 'ohlcv_data\\' + file
+        file = 'crypto_data\\' + file
         retdf.drop_duplicates(inplace=True) #note much easier to drop duplicates than try to prevent them due to potentially different timeframes
         retdf.to_csv(file) #=(A2/86400000)+25569 converts to excel date
         print(symb,"data saved")
@@ -134,4 +132,5 @@ def timestampToUTCMs(dateT=None):
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    getAndSaveData(['VIB/BTC'], exchange, '7/1/18', '10/30/20')
+    print(symbols)
+    getAndSaveData(symbols, exchange, '7/1/18', '10/30/20')
