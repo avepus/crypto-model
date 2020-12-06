@@ -2,11 +2,12 @@
 """
 Created on Sat Apr 25 22:09:42 2020
 
-@author: Avery
+@author: Avery And Jake
 """
 
 import ccxt
 import pandas as pd
+import numpy
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
