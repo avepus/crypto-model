@@ -3,6 +3,9 @@
 Created on Sat Apr 25 22:09:42 2020
 
 @author: Avery And Jake
+Together :')
+
+
 """
 
 import ccxt
@@ -12,6 +15,7 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 
+print("wowza")
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
     exchange_id = 'binance'
