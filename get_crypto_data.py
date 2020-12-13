@@ -83,7 +83,7 @@ def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
     return ret
 
 
-def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret_as_list=True, filename = "MarketData", timeframe = '1d', max_calls=10):
+def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret_as_list=False, filename = "MarketData", timeframe = '1d', max_calls=10):
     """gets a dataframe in the expected format
     
     Parameters:
