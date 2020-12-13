@@ -11,6 +11,8 @@ import numpy
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
+import glob
+
 
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
@@ -20,6 +22,7 @@ def getBinanceExchange():
         'timeout': 30000,
         'enableRateLimit': True,
         })
+
 
 def tryGetDataFrame(symbol, exchange=None, timeFrame = '1d', inSince=None, lastCall=None):
     """
@@ -51,11 +54,13 @@ def tryGetDataFrame(symbol, exchange=None, timeFrame = '1d', inSince=None, lastC
     df['Symbol'] = symbol
     return df
 
+
 def getAllTickers(exchange):
     if not (exchange.has['fetchTickers']):
         print("Exchange cannot fetch all tickers")
     else:
         return exchange.fetch_tickers()
+
 
 def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
     """
@@ -74,6 +79,42 @@ def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
         if quoteSymbol in symbol:
             ret.append(symbol)
     return ret
+
+
+def get_df(symbols, exchange, from_date, includeDate='1-1-1900', fileName = "MarketData", timeFrame = '1d', maxCalls=5):
+    """gets a dataframe in the expected format"""
+    from_date = timestampToUTCMs(getUTCTimeStamp(from_date))
+    includeStamp = timestampToUTCMs(getUTCTimeStamp(includeDate))
+    for symb in symbols:
+        sleep(exchange.rateLimit / 1000)
+        attempt = 1
+        print('Fetching',symb,'market data. call #',attempt,sep='')
+        df = tryGetDataFrame(symb, exchange, timeFrame, from_date)
+        if df.empty:
+            print('Failed to retrieve',symb,'data')
+            continue
+        retdf = df
+        while (len(df) == 500 and attempt < maxCalls):
+            attempt += 1
+            new_from_date=df.index[-1]
+            sleep(exchange.rateLimit / 1000)
+            print('Fetching ',symb,' market data. call #',attempt,sep='')
+            df = tryGetDataFrame(symb, exchange, timeFrame, new_from_date)
+            retdf = retdf.append(df)
+        #Commenting out becuase we wouldn't know at the current time of
+        #evaluation if a currency is delisted in the future
+        # if retdf.loc[includeStamp:,:].empty:
+        #     print(symb,'data did not include',includeDate,'data not saved.')
+        #     if attempt >= maxCalls:
+        #         print('Maximum data retrivals (',maxCalls,') hit.', sep='')
+        #     continue
+        file = fileName + symb + ".csv"
+        file = file.replace("/", "")
+        file = 'ohlcv_data\\' + file
+        retdf.drop_duplicates(inplace=True) #note much easier to drop duplicates than try to prevent them due to potentially different timeframes
+        retdf.to_csv(file) #=(A2/86400000)+25569 converts to excel date
+        print(symb,"data saved")
+
 
 def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = "MarketData", timeFrame = '1d', maxCalls=5):
     """
@@ -110,7 +151,7 @@ def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = 
             df = tryGetDataFrame(symb, exchange, timeFrame, newSince)
             retdf = retdf.append(df)
         #Commenting out becuase we wouldn't know at the current time of
-        #evaluation if a currency would be delisted in the future
+        #evaluation if a currency is delisted in the future
         # if retdf.loc[includeStamp:,:].empty:
         #     print(symb,'data did not include',includeDate,'data not saved.')
         #     if attempt >= maxCalls:
@@ -122,15 +163,20 @@ def getAndSaveData(symbols, exchange, since, includeDate='1-1-1900', fileName = 
         retdf.drop_duplicates(inplace=True) #note much easier to drop duplicates than try to prevent them due to potentially different timeframes
         retdf.to_csv(file) #=(A2/86400000)+25569 converts to excel date
         print(symb,"data saved")
-        
-def getUTCTimeStamp(timeStr=str(datetime.today())):
-    return parser.parse(timeStr, default=datetime.utcnow())
+
+
+def getUTCTimeStamp(timeStr=None):
+    if timeStr is None:
+        return timestampToUTCMs()
+    return parser.parse(timeStr).replace(tzinfo = tz.tzutc())
+
 
 def timestampToUTCMs(dateT=None):
     if dateT is None:
         dateT = datetime.now()
     return int(round(dateT.replace(tzinfo = tz.tzutc()).timestamp() * 1000))
-    
+   
+
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
