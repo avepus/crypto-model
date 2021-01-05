@@ -15,11 +15,12 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import glob
+import database
+import sqlite3
 
 #global variables
 saved_data_directory = 'ohlcv_data\\'
 
-print("wowza")
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
     exchange_id = 'binance'
@@ -57,7 +58,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     print('lastCall =',last_request_time_ms,'fetching data...')
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
-    df['Symbol'] = symbol
+    df['Ticker'] = symbol
     return df
 
 
@@ -104,16 +105,19 @@ def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret
         return_df = []
     else:
         return_df = pd.DataFrame()
-        
+    connection = database.create_connection()
     for symbol in symbol_list:
-        df = get_saved_data(symbol, from_date, end_date)
+        df = get_saved_data(symbol, connection, from_date, end_date)
         if df.empty and exchange is not None and from_date is not None:
             df = retrieve_data_from_exchange(symbol, exchange, from_date, end_date, timeframe, max_calls)
-            if not df.empty:
-                save_data(df, symbol, filename)
-        if df.empty: #enhancement is to call check_retrival_for_errors(df) for warnings/errors regarding data retrieval
-            print('Failed to retrieve',symbol,'data')
-        return_df.append(df)
+            if df.empty: #enhancement is to call check_retrival_for_errors(df) for warnings/errors regarding data retrieval
+                print('Failed to retrieve',symbol,'data')
+                continue
+            df.to_sql('OHLCV_DATA', connection, if_exists='append')
+            df.index = pd.to_datetime(df.index, unit='ms')
+            #save_data(df, symbol, filename)
+        return_df = return_df.append(df)
+    connection.close()
     return return_df
 
 
@@ -144,7 +148,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, time
     return retdf
 
 
-def get_saved_data(symbol, from_date=None, end_date=None):
+def get_saved_data_old(symbol, from_date=None, end_date=None):
     symbol = symbol.replace('/', '')
     search_name = saved_data_directory + '*' + symbol + '.csv'
     try:
@@ -155,19 +159,32 @@ def get_saved_data(symbol, from_date=None, end_date=None):
     df = pd.read_csv(file)
     df = set_data_timestamp_index(df)
     return df.loc[from_date:end_date]
+    
+def get_saved_data(symbol, connection, from_date=None, end_date=None):
+    query = """SELECT * FROM OHLCV_DATA WHERE Ticker == '{0}'""".format(symbol)
+    try:
+        df = pd.read_sql_query(query, connection)
+    except:
+        print('Query failed: \n' + query)
+    if df.empty:
+        return df
+    return set_data_timestamp_index(df)
 
 
-def set_data_timestamp_index(df):
-    col = None
-    unit = None
-    if ("Date" in df.columns):
-        col = "Date"
-    if ("Timestamp" in df.columns):
-        col = "Timestamp"
-        unit = 'ms'
-    df.loc[:,col] = pd.to_datetime(df.loc[:,col], unit=unit)
-    if col is not None:
-        return df.set_index(col)
+
+def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
+    """converts column with lable "Timestamp" of a DataFrame
+    to a datetime and makes it the index
+
+    Args:
+        df (DataFrame): Pandas dataframe
+
+    Returns:
+        DataFrame: new Pandas DataFrame with updated index
+    """
+    retdf = df.set_index('Timestamp')
+    retdf.index = pd.to_datetime(retdf.index, unit=unit)
+    return retdf
 
 
 def save_data(df, symbol, filename, show_output=True):
@@ -193,6 +210,6 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 
 if __name__ == '__main__':
     exchange = getBinanceExchange()
-    symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['ETH/BTC'], exchange, '7/1/18')
+    #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
+    df = get_DataFrame(['VIB/BTC'], exchange, '1/1/20')
     print(df)
