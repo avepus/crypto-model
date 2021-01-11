@@ -19,7 +19,7 @@ def create_connection():
 
 def create_ohlcv_table(connection):
     sql_create_ohlcv_table = """ CREATE TABLE IF NOT EXISTS OHLCV_DATA (
-                                        Ticker string NOT NULL,
+                                        Symbol string NOT NULL,
                                         Timestamp integer NOT NULL,
                                         Open real NOT NULL,
                                         High real NOT NULL,
@@ -27,7 +27,7 @@ def create_ohlcv_table(connection):
                                         Close real NOT NULL,
                                         Volume integer NOT NULL,
                                         Is_Final_Row integer,
-                                        PRIMARY KEY (Ticker, Timestamp)
+                                        PRIMARY KEY (Symbol, Timestamp)
                                         CHECK(Is_Final_Row == 0 or Is_Final_Row == 1 or Is_Final_Row is NULL)
                                     ); """
     try:
@@ -38,8 +38,8 @@ def create_ohlcv_table(connection):
 
 def insert_ohlcv_row(connection):
     sql = ''' INSERT INTO OHLCV_DATA
-              VALUES(:Ticker,:Timestamp,:Open,:High,:Low,:Close,:Volume,:Is_Final_Row)'''
-    value_map = {'Ticker' : 'BTC',
+              VALUES(:Symbol,:Timestamp,:Open,:High,:Low,:Close,:Volume,:Is_Final_Row)'''
+    value_map = {'Symbol' : 'BTC',
                 'Timestamp' : 124,
                 'Open' : 10.0,
                 'High' : 11.1,
@@ -60,9 +60,9 @@ def print_all_ohlcv_data(connection):
 if __name__ == '__main__':
     connection = create_connection()
     if connection is not None:
-        create_ohlcv_table(connection)
+        #create_ohlcv_table(connection)
         insert_ohlcv_row(connection)
-        print_all_ohlcv_data(connection)
+        #print_all_ohlcv_data(connection)
         connection.close()
     else:
         print("Error! Cannot create database connection.")

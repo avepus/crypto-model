@@ -58,7 +58,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     print('lastCall =',last_request_time_ms,'fetching data...')
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
-    df['Ticker'] = symbol
+    df['Symbol'] = symbol
     return df
 
 
@@ -88,31 +88,43 @@ def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
     return ret
 
 
-def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret_as_list=False, filename = "MarketData", timeframe = '1d', max_calls=10):
+def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date_str='1/1/2050', ret_as_list=False, filename = "MarketData", timeframe = '1d', max_calls=10):
     """gets a dataframe in the expected format
     
     Parameters:
         symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
         exchange (ccxt class) -- ccxt exchange to retrieve data from
-        from_date (str) -- string representation of start date timeframe
-        end_date (str) -- string representation of end date timeframe
+        from_date_str (str) -- string representation of start date timeframe
+        end_date_str (str) -- string representation of end date timeframe
         ret_as_list (bool) -- boolean indicating to return list of dfs or single df
         fileName (str) -- beginning of the file name
         timeFrame (str) -- timeframe to pull
         maxCalls (int) -- max number of data pulls for a given currency
+                            intended for use as safety net to prevent too many calls
     """
     if ret_as_list:
         return_df = []
     else:
         return_df = pd.DataFrame()
     connection = database.create_connection()
+    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str)
+
+    from_date = parser.parse(from_date_str)
+    end_date = parser.parse(end_date_str)
+
     for symbol in symbol_list:
-        df = get_saved_data(symbol, connection, from_date, end_date)
-        if df.empty and exchange is not None and from_date is not None:
-            df = retrieve_data_from_exchange(symbol, exchange, from_date, end_date, timeframe, max_calls)
+        symbol_df = df.loc[df['Symbol'] == symbol]
+        first_df_date = symbol_df.index.min
+        need_prior_data = first_df_date != from_date and symbol_df.at[first_df_date,'Is_Final_Row'] != 1
+        last_df_date = symbol.df.index.max
+        need_later_data = last_df_date != end_date and symbol_df.at[last_df_date,'Is_Final_Row'] != 1
+        #left off here. need to implement only pulling needed data
+        if df.empty and exchange is not None and from_date_str is not None:
+            df = retrieve_data_from_exchange(symbol, exchange, from_date_str, end_date_str, timeframe, max_calls)
             if df.empty: #enhancement is to call check_retrival_for_errors(df) for warnings/errors regarding data retrieval
                 print('Failed to retrieve',symbol,'data')
                 continue
+            df = populate_first_final(df)
             df.to_sql('OHLCV_DATA', connection, if_exists='append')
             df.index = pd.to_datetime(df.index, unit='ms')
             #save_data(df, symbol, filename)
@@ -120,6 +132,11 @@ def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret
     connection.close()
     return return_df
 
+
+def populate_first_final(df):
+    #needs to be implemented
+    df['Is_Final_Row'] = 0
+    return df
 
 def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, timeframe = '1d', max_calls=10):
     from_date_as_ms_timestamp = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date))
@@ -160,14 +177,25 @@ def get_saved_data_old(symbol, from_date=None, end_date=None):
     df = set_data_timestamp_index(df)
     return df.loc[from_date:end_date]
     
-def get_saved_data(symbol, connection, from_date=None, end_date=None):
-    query = """SELECT * FROM OHLCV_DATA WHERE Ticker == '{0}'""".format(symbol)
+def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=None):
+    symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
+    start_condition = ''
+    end_condition = ''
+    if start_date_str:
+        start_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(start_date_str))
+        start_condition = f'and TIMESTAMP >= {start_date}'
+    if end_date_str:
+        end_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date_str))
+        end_condition = f'and TIMESTAMP <= {end_date}'
+    query = f"""SELECT * FROM OHLCV_DATA 
+        WHERE {symbol_condition}
+        {start_condition}
+        {end_condition}"""
+    df = pd.DataFrame
     try:
         df = pd.read_sql_query(query, connection)
     except:
         print('Query failed: \n' + query)
-    if df.empty:
-        return df
     return set_data_timestamp_index(df)
 
 
@@ -182,12 +210,14 @@ def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
     Returns:
         DataFrame: new Pandas DataFrame with updated index
     """
+    if df.empty:
+        return df
     retdf = df.set_index('Timestamp')
     retdf.index = pd.to_datetime(retdf.index, unit=unit)
     return retdf
 
 
-def save_data(df, symbol, filename, show_output=True):
+def save_data_old(df, symbol, filename, show_output=True):
     file = filename + symbol + ".csv"
     file = file.replace("/", "")
     file = saved_data_directory + file
