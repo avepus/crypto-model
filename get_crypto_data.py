@@ -10,6 +10,7 @@ Together :')
 
 import ccxt
 import pandas as pd
+import numpy as np
 import numpy
 from time import sleep
 from datetime import datetime, timedelta, timezone
@@ -59,6 +60,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
     df['Symbol'] = symbol
+    df['Is_Final_Row'] = np.nan
     return df
 
 
@@ -114,54 +116,58 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
 
     for symbol in symbol_list:
         symbol_df = df.loc[df['Symbol'] == symbol]
-        first_df_date = symbol_df.index.min
-        need_prior_data = first_df_date != from_date and symbol_df.at[first_df_date,'Is_Final_Row'] != 1
-        last_df_date = symbol.df.index.max
-        need_later_data = last_df_date != end_date and symbol_df.at[last_df_date,'Is_Final_Row'] != 1
         #left off here. need to implement only pulling needed data
-        if df.empty and exchange is not None and from_date_str is not None:
-            df = retrieve_data_from_exchange(symbol, exchange, from_date_str, end_date_str, timeframe, max_calls)
-            if df.empty: #enhancement is to call check_retrival_for_errors(df) for warnings/errors regarding data retrieval
+        if symbol_df.empty and exchange is not None and from_date_str is not None:
+            symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_str, end_date_str, timeframe, max_calls)
+            if symbol_df.empty:
                 print('Failed to retrieve',symbol,'data')
                 continue
-            df = populate_first_final(df)
-            df.to_sql('OHLCV_DATA', connection, if_exists='append')
-            df.index = pd.to_datetime(df.index, unit='ms')
+            symbol_df = populate_first_final(symbol_df)
+            symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
+            symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
             #save_data(df, symbol, filename)
+        else:
+            first_df_date = symbol_df.index.min()
+            need_prior_data = first_df_date != from_date and symbol_df.at[first_df_date,'Is_Final_Row'] != 1
+            last_df_date = symbol.df.index.max()
+            need_later_data = last_df_date != end_date and symbol_df.at[last_df_date,'Is_Final_Row'] != 1
+            #left off here. need to pull data
         return_df = return_df.append(df)
     connection.close()
     return return_df
 
 
-def populate_first_final(df):
-    #needs to be implemented
-    df['Is_Final_Row'] = 0
+def populate_is_final_column(df, from_date_ms, end_date_ms):
+    if from_date_ms < df.index.min():
+        df.at[df.index.min(),'Is_Final_Row'] = 1
+    two_days_ms = 2 * 24 * 60 * 60 * 1000
+    end_date_is_older_than_two_days = end_date_ms < (convert_datetime_to_UTC_Ms() - two_days_ms)
+    if df.index.max() < end_date_ms and end_date_is_older_than_two_days:
+        df.at[df.index.max(),'Is_Final_Row'] = 1
     return df
 
 def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, timeframe = '1d', max_calls=10):
-    from_date_as_ms_timestamp = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date))
+    from_date_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date))
+    end_date_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date))
     sleep(exchange.rateLimit / 1000)
     call_count = 1
     print('Fetching',symbol,'market data from',exchange,'. call #',call_count,sep='')
-    df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, from_date_as_ms_timestamp)
+    df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, from_date_ms)
     if df.empty:
         print('Failed to retrieve',symbol,'data')
         return pd.DataFrame()
     retdf = df
-    while (len(df) == 500 and call_count < max_calls):
+    while (len(df) == 500 and call_count < max_calls and retdf.index.max() < end_date_ms):
         call_count += 1
         new_from_date=df.index[-1]
         sleep(exchange.rateLimit / 1000)
         print('Fetching ',symbol,' market data. call #',call_count,sep='')
         df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, new_from_date)
         retdf = retdf.append(df)
-    #Commenting out becuase we wouldn't know at the current time of
-    #evaluation if a currency is delisted in the future
-    # if retdf.loc[includeStamp:,:].empty:
-    #     print(symbol,'data did not include',includeDate,'data not saved.')
-    #     if attempt >= maxCalls:
-    #         print('Maximum data retrivals (',maxCalls,') hit.', sep='')
-    #     continue
+    if len(df) == 500 and call_count >= max_calls and retdf.index.max() < end_date_ms:
+        print('Maximum data retrivals (',max_calls,') hit.', sep='')
+        return pd.DataFrame()
+    populate_is_final_column(retdf, from_date_ms, end_date_ms)
     return retdf
 
 
@@ -228,7 +234,7 @@ def save_data_old(df, symbol, filename, show_output=True):
 
 def get_UTC_datetime(datetime_string=None):
     if datetime_string is None:
-        return convert_datetime_to_UTC_Ms()
+        return datetime.now()
     return parser.parse(datetime_string).replace(tzinfo = tz.tzutc())
 
 
