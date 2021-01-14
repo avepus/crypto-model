@@ -109,30 +109,43 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
     else:
         return_df = pd.DataFrame()
     connection = database.create_connection()
+
     df = get_saved_data(symbol_list, connection, from_date_str, end_date_str)
 
     from_date = parser.parse(from_date_str)
     end_date = parser.parse(end_date_str)
 
+    from_date_ms = convert_datetime_to_UTC_Ms(from_date)
+    end_date_ms = convert_datetime_to_UTC_Ms(end_date)
+
     for symbol in symbol_list:
         symbol_df = df.loc[df['Symbol'] == symbol]
-        #left off here. need to implement only pulling needed data
         if symbol_df.empty and exchange is not None and from_date_str is not None:
-            symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_str, end_date_str, timeframe, max_calls)
+            symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms, timeframe, max_calls)
             if symbol_df.empty:
                 print('Failed to retrieve',symbol,'data')
                 continue
-            symbol_df = populate_first_final(symbol_df)
             symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
             symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
             #save_data(df, symbol, filename)
         else:
-            first_df_date = symbol_df.index.min()
-            need_prior_data = first_df_date != from_date and symbol_df.at[first_df_date,'Is_Final_Row'] != 1
-            last_df_date = symbol.df.index.max()
-            need_later_data = last_df_date != end_date and symbol_df.at[last_df_date,'Is_Final_Row'] != 1
-            #left off here. need to pull data
-        return_df = return_df.append(df)
+            first_df_timestamp = symbol_df.index.min()
+            need_prior_data = first_df_timestamp != from_date_ms and symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1
+            if need_prior_data:
+                print(f'Need prior data for {symbol}. Retreiving data from {from_date_str} ({from_date_ms}) to {datetime.fromtimestamp(first_df_timestamp / 1000, tz.tzutc())} ({first_df_timestamp})')
+                prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
+                prior_data.to_sql('OHLCV_DATA', connection, if_exists='append') #I think this will append a duplicate row
+                symbol_df.append(prior_data)
+            last_df_timestamp = symbol_df.index.max()
+            two_days_ms = 2 * 24 * 60 * 60 * 1000
+            last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
+            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != 1 and last_timestamp_is_older_than_two_days
+            if need_later_data:
+                print(f'Need later data for {symbol}. Retreiving data from {datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
+                later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
+                later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
+                symbol_df.append(later_data)
+        return_df = return_df.append(set_data_timestamp_index(df))
     connection.close()
     return return_df
 
@@ -146,9 +159,9 @@ def populate_is_final_column(df, from_date_ms, end_date_ms):
         df.at[df.index.max(),'Is_Final_Row'] = 1
     return df
 
-def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, timeframe = '1d', max_calls=10):
-    from_date_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date))
-    end_date_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date))
+def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None, timeframe = '1d', max_calls=10):
+    if not end_date_ms:
+        convert_datetime_to_UTC_Ms()
     sleep(exchange.rateLimit / 1000)
     call_count = 1
     print('Fetching',symbol,'market data from',exchange,'. call #',call_count,sep='')
@@ -168,7 +181,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, time
         print('Maximum data retrivals (',max_calls,') hit.', sep='')
         return pd.DataFrame()
     populate_is_final_column(retdf, from_date_ms, end_date_ms)
-    return retdf
+    return retdf.loc[from_date_ms:end_date_ms,:]
 
 
 def get_saved_data_old(symbol, from_date=None, end_date=None):
@@ -197,12 +210,12 @@ def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=No
         WHERE {symbol_condition}
         {start_condition}
         {end_condition}"""
-    df = pd.DataFrame
+    df = pd.DataFrame()
     try:
         df = pd.read_sql_query(query, connection)
     except:
         print('Query failed: \n' + query)
-    return set_data_timestamp_index(df)
+    return df.set_index('Timestamp')
 
 
 
@@ -216,9 +229,11 @@ def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
     Returns:
         DataFrame: new Pandas DataFrame with updated index
     """
-    if df.empty:
-        return df
-    retdf = df.set_index('Timestamp')
+    retdf = df.copy()
+    if retdf.empty:
+        return retdf
+    if retdf.index.name != 'Timestamp':
+        retdf = retdf.set_index('Timestamp')
     retdf.index = pd.to_datetime(retdf.index, unit=unit)
     return retdf
 
