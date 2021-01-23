@@ -12,7 +12,6 @@ def create_connection():
     connection = None
     try:
         connection = sqlite3.connect(database_file)
-        print(sqlite3.version)
     except Error as err:
         print(err)
     return connection

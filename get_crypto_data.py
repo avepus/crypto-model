@@ -3,7 +3,6 @@
 Created on Sat Apr 25 22:09:42 2020
 
 @author: Avery And Jake
-Together :')
 
 
 """
@@ -20,7 +19,7 @@ import database
 import sqlite3
 
 #global variables
-saved_data_directory = 'ohlcv_data\\'
+#saved_data_directory = 'ohlcv_data\\'
 
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
@@ -31,6 +30,8 @@ def getBinanceExchange():
         'enableRateLimit': True,
         })
 
+def get_empty_ohlcv_df():
+    return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
@@ -60,7 +61,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
     df['Symbol'] = symbol
-    df['Is_Final_Row'] = np.nan
+    df['Is_Final_Row'] = None
     return df
 
 
@@ -145,7 +146,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
                 later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
                 later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
                 symbol_df.append(later_data)
-        return_df = return_df.append(set_data_timestamp_index(df))
+        return_df = return_df.append(set_data_timestamp_index(symbol_df))
     connection.close()
     return return_df
 
@@ -184,17 +185,17 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     return retdf.loc[from_date_ms:end_date_ms,:]
 
 
-def get_saved_data_old(symbol, from_date=None, end_date=None):
-    symbol = symbol.replace('/', '')
-    search_name = saved_data_directory + '*' + symbol + '.csv'
-    try:
-        file = glob.glob(search_name)[0]
-    except IndexError:
-        return pd.DataFrame()
+# def get_saved_data_old(symbol, from_date=None, end_date=None):
+#     symbol = symbol.replace('/', '')
+#     search_name = saved_data_directory + '*' + symbol + '.csv'
+#     try:
+#         file = glob.glob(search_name)[0]
+#     except IndexError:
+#         return pd.DataFrame()
     
-    df = pd.read_csv(file)
-    df = set_data_timestamp_index(df)
-    return df.loc[from_date:end_date]
+#     df = pd.read_csv(file)
+#     df = set_data_timestamp_index(df)
+#     return df.loc[from_date:end_date]
     
 def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=None):
     symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
@@ -210,11 +211,12 @@ def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=No
         WHERE {symbol_condition}
         {start_condition}
         {end_condition}"""
-    df = pd.DataFrame()
     try:
         df = pd.read_sql_query(query, connection)
-    except:
+    except Exception as e:
         print('Query failed: \n' + query)
+        print(e)
+        return get_empty_ohlcv_df()
     return df.set_index('Timestamp')
 
 
@@ -238,13 +240,13 @@ def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
     return retdf
 
 
-def save_data_old(df, symbol, filename, show_output=True):
-    file = filename + symbol + ".csv"
-    file = file.replace("/", "")
-    file = saved_data_directory + file
-    df.to_csv(file)
-    if show_output:
-        print('data saved successfully to "',file,'"',sep='')
+# def save_data_old(df, symbol, filename, show_output=True):
+#     file = filename + symbol + ".csv"
+#     file = file.replace("/", "")
+#     file = saved_data_directory + file
+#     df.to_csv(file)
+#     if show_output:
+#         print('data saved successfully to "',file,'"',sep='')
 
 
 def get_UTC_datetime(datetime_string=None):
