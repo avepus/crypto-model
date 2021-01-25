@@ -131,16 +131,15 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
             #save_data(df, symbol, filename)
         else:
             first_df_timestamp = symbol_df.index.min()
-            need_prior_data = first_df_timestamp != from_date_ms and symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1
+            need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != '1')
             if need_prior_data:
-                print(f'Need prior data for {symbol}. Retreiving data from {from_date_str} ({from_date_ms}) to {datetime.fromtimestamp(first_df_timestamp / 1000, tz.tzutc())} ({first_df_timestamp})')
                 prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
                 prior_data.to_sql('OHLCV_DATA', connection, if_exists='append') #I think this will append a duplicate row
                 symbol_df.append(prior_data)
             last_df_timestamp = symbol_df.index.max()
             two_days_ms = 2 * 24 * 60 * 60 * 1000
             last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
-            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != 1 and last_timestamp_is_older_than_two_days
+            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != '1' and last_timestamp_is_older_than_two_days
             if need_later_data:
                 print(f'Need later data for {symbol}. Retreiving data from {datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
                 later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
@@ -212,7 +211,7 @@ def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=No
         {start_condition}
         {end_condition}"""
     try:
-        df = pd.read_sql_query(query, connection)
+        df = pd.read_sql_query(query, connection, coerce_float=True)
     except Exception as e:
         print('Query failed: \n' + query)
         print(e)
