@@ -61,7 +61,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
     df['Symbol'] = symbol
-    df['Is_Final_Row'] = None
+    df['Is_Final_Row'] = np.nan
     return df
 
 
@@ -121,17 +121,16 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
 
     for symbol in symbol_list:
         symbol_df = df.loc[df['Symbol'] == symbol]
-        if symbol_df.empty and exchange is not None and from_date_str is not None:
+        if symbol_df.empty and exchange is not None:
             symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms, timeframe, max_calls)
             if symbol_df.empty:
                 print('Failed to retrieve',symbol,'data')
                 continue
             symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
             symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
-            #save_data(df, symbol, filename)
-        else:
+        elif exchange is not None:
             first_df_timestamp = symbol_df.index.min()
-            need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != '1')
+            need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1)
             if need_prior_data:
                 prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
                 prior_data.to_sql('OHLCV_DATA', connection, if_exists='append') #I think this will append a duplicate row
@@ -139,12 +138,14 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
             last_df_timestamp = symbol_df.index.max()
             two_days_ms = 2 * 24 * 60 * 60 * 1000
             last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
-            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != '1' and last_timestamp_is_older_than_two_days
+            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != 1 and last_timestamp_is_older_than_two_days
             if need_later_data:
                 print(f'Need later data for {symbol}. Retreiving data from {datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
                 later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
                 later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
                 symbol_df.append(later_data)
+        else:
+            raise NameError('Data is missing for',symbol,'but no exchange was passed in to retrieve data from')
         return_df = return_df.append(set_data_timestamp_index(symbol_df))
     connection.close()
     return return_df
@@ -158,6 +159,7 @@ def populate_is_final_column(df, from_date_ms, end_date_ms):
     if df.index.max() < end_date_ms and end_date_is_older_than_two_days:
         df.at[df.index.max(),'Is_Final_Row'] = 1
     return df
+    
 
 def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None, timeframe = '1d', max_calls=10):
     if not end_date_ms:
@@ -182,20 +184,8 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
         return pd.DataFrame()
     populate_is_final_column(retdf, from_date_ms, end_date_ms)
     return retdf.loc[from_date_ms:end_date_ms,:]
-
-
-# def get_saved_data_old(symbol, from_date=None, end_date=None):
-#     symbol = symbol.replace('/', '')
-#     search_name = saved_data_directory + '*' + symbol + '.csv'
-#     try:
-#         file = glob.glob(search_name)[0]
-#     except IndexError:
-#         return pd.DataFrame()
     
-#     df = pd.read_csv(file)
-#     df = set_data_timestamp_index(df)
-#     return df.loc[from_date:end_date]
-    
+
 def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=None):
     symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
     start_condition = ''
@@ -211,11 +201,12 @@ def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=No
         {start_condition}
         {end_condition}"""
     try:
-        df = pd.read_sql_query(query, connection, coerce_float=True)
+        df = pd.read_sql_query(query, connection)
     except Exception as e:
         print('Query failed: \n' + query)
         print(e)
         return get_empty_ohlcv_df()
+    df['Is_Final_Row'] = pd.to_numeric(df['Is_Final_Row'], errors='coerce')
     return df.set_index('Timestamp')
 
 
@@ -237,15 +228,6 @@ def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
         retdf = retdf.set_index('Timestamp')
     retdf.index = pd.to_datetime(retdf.index, unit=unit)
     return retdf
-
-
-# def save_data_old(df, symbol, filename, show_output=True):
-#     file = filename + symbol + ".csv"
-#     file = file.replace("/", "")
-#     file = saved_data_directory + file
-#     df.to_csv(file)
-#     if show_output:
-#         print('data saved successfully to "',file,'"',sep='')
 
 
 def get_UTC_datetime(datetime_string=None):
