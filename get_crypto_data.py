@@ -21,6 +21,12 @@ import sqlite3
 #global variables
 #saved_data_directory = 'ohlcv_data\\'
 
+timeframe_map_ms = { 
+        '1m': 60000,
+        '1h': 3600000,
+        '1d': 86400000
+    }
+
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
     exchange_id = 'binance'
@@ -30,8 +36,10 @@ def getBinanceExchange():
         'enableRateLimit': True,
         })
 
+
 def get_empty_ohlcv_df():
     return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
+
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
@@ -129,21 +137,26 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
             symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
             symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
         elif exchange is not None:
-            first_df_timestamp = symbol_df.index.min()
+            first_df_timestamp = symbol_df.index.min().item() #.item() gets us the native python number type instead of the numpy type
             need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1)
             if need_prior_data:
+                first_df_timestamp -= 1 #we subtract 1 to the timestamp to pull the up to this timestamp which avoids duplicates
+                first_df_timestamp_str = datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())
+                print(f'Need earlier data for {symbol}. Retreiving data from {from_date_str} ({from_date_ms}) to {first_df_timestamp_str} ({first_df_timestamp})')
                 prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
                 prior_data.to_sql('OHLCV_DATA', connection, if_exists='append') #I think this will append a duplicate row
-                symbol_df.append(prior_data)
-            last_df_timestamp = symbol_df.index.max()
+                symbol_df = symbol_df.append(prior_data)
+            last_df_timestamp = symbol_df.index.max().item()
             two_days_ms = 2 * 24 * 60 * 60 * 1000
             last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
             need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != 1 and last_timestamp_is_older_than_two_days
             if need_later_data:
-                print(f'Need later data for {symbol}. Retreiving data from {datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
+                last_df_timestamp += 1 #we add 1 to the timestamp to pull the next timestamp data and to avoid duplicates
+                last_df_timestamp_str = datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())
+                print(f'Need later data for {symbol}. Retreiving data from {last_df_timestamp_str} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
                 later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
                 later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
-                symbol_df.append(later_data)
+                symbol_df = symbol_df.append(later_data)
         else:
             raise NameError('Data is missing for',symbol,'but no exchange was passed in to retrieve data from')
         return_df = return_df.append(set_data_timestamp_index(symbol_df))
@@ -151,12 +164,23 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
     return return_df
 
 
-def populate_is_final_column(df, from_date_ms, end_date_ms):
-    if from_date_ms < df.index.min():
+def populate_is_final_column(df, from_date_ms, end_date_ms, timeframe):
+    """populates Is_Final_Column to indicate that no past or future data
+    exists past that row
+    
+    Parameters:
+        df (DataFrame) -- dataframe for which to popualte the column
+        from_date_ms (int) -- from date in milliseconds
+        end_date_ms (int) -- end date in milliseconds
+        timeframe (str) -- timeframe that data is in (e.g. 1h, 1d, 1m, etc.)
+    """
+    #if our from date is less than one bar behind our earliest data then there is no previous data
+    if from_date_ms < (df.index.min() - timeframe_map_ms[timeframe]): 
         df.at[df.index.min(),'Is_Final_Row'] = 1
-    two_days_ms = 2 * 24 * 60 * 60 * 1000
+    two_days_ms = 2 * timeframe_map_ms[timeframe]
     end_date_is_older_than_two_days = end_date_ms < (convert_datetime_to_UTC_Ms() - two_days_ms)
-    if df.index.max() < end_date_ms and end_date_is_older_than_two_days:
+    #if our end date is greater than one bar past our latest data then this is no future data
+    if end_date_ms > (df.index.max() + timeframe_map_ms[timeframe]) and end_date_is_older_than_two_days:
         df.at[df.index.max(),'Is_Final_Row'] = 1
     return df
     
@@ -182,7 +206,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     if len(df) == 500 and call_count >= max_calls and retdf.index.max() < end_date_ms:
         print('Maximum data retrivals (',max_calls,') hit.', sep='')
         return pd.DataFrame()
-    populate_is_final_column(retdf, from_date_ms, end_date_ms)
+    populate_is_final_column(retdf, from_date_ms, end_date_ms, timeframe)
     return retdf.loc[from_date_ms:end_date_ms,:]
     
 
@@ -245,5 +269,5 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['VIB/BTC'], exchange, '1/1/20')
+    df = get_DataFrame(['RIF/BTC'], exchange, '1/21/21', '1/29/21')
     print(df)
