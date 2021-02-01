@@ -141,11 +141,11 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
             need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1)
             if need_prior_data:
                 first_df_timestamp -= 1 #we subtract 1 to the timestamp to pull the up to this timestamp which avoids duplicates
-                first_df_timestamp_str = datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())
+                first_df_timestamp_str = datetime.fromtimestamp(first_df_timestamp / 1000, tz.tzutc())
                 print(f'Need earlier data for {symbol}. Retreiving data from {from_date_str} ({from_date_ms}) to {first_df_timestamp_str} ({first_df_timestamp})')
                 prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
-                prior_data.to_sql('OHLCV_DATA', connection, if_exists='append') #I think this will append a duplicate row
-                symbol_df = symbol_df.append(prior_data)
+                prior_data.to_sql('OHLCV_DATA', connection, if_exists='append')
+                symbol_df = symbol_df.append(prior_data).sort_index() #we sort index when appending prior data so it doesn't append to the end
             last_df_timestamp = symbol_df.index.max().item()
             two_days_ms = 2 * 24 * 60 * 60 * 1000
             last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
@@ -190,7 +190,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
         convert_datetime_to_UTC_Ms()
     sleep(exchange.rateLimit / 1000)
     call_count = 1
-    print('Fetching',symbol,'market data from',exchange,'. call #',call_count,sep='')
+    print(f'Fetching {symbol} market data from {exchange}. call #{call_count}')
     df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, from_date_ms)
     if df.empty:
         print('Failed to retrieve',symbol,'data')
@@ -198,13 +198,13 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     retdf = df
     while (len(df) == 500 and call_count < max_calls and retdf.index.max() < end_date_ms):
         call_count += 1
-        new_from_date=df.index[-1]
+        new_from_date = df.index[-1].item()
         sleep(exchange.rateLimit / 1000)
-        print('Fetching ',symbol,' market data. call #',call_count,sep='')
+        print(f'Fetching {symbol} market data from {exchange}. call #{call_count}')
         df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, new_from_date)
         retdf = retdf.append(df)
     if len(df) == 500 and call_count >= max_calls and retdf.index.max() < end_date_ms:
-        print('Maximum data retrivals (',max_calls,') hit.', sep='')
+        print(f'Maximum data retrivals ({max_calls}) hit.')
         return pd.DataFrame()
     populate_is_final_column(retdf, from_date_ms, end_date_ms, timeframe)
     return retdf.loc[from_date_ms:end_date_ms,:]
@@ -269,5 +269,5 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['RIF/BTC'], exchange, '1/21/21', '1/29/21')
+    df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20')
     print(df)
