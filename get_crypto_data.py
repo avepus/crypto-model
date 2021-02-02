@@ -3,23 +3,30 @@
 Created on Sat Apr 25 22:09:42 2020
 
 @author: Avery And Jake
-Together :')
 
 
 """
 
 import ccxt
 import pandas as pd
+import numpy as np
 import numpy
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import glob
+import database
+import sqlite3
 
 #global variables
-saved_data_directory = 'ohlcv_data\\'
+#saved_data_directory = 'ohlcv_data\\'
 
-print("wowza")
+timeframe_map_ms = { 
+        '1m': 60000,
+        '1h': 3600000,
+        '1d': 86400000
+    }
+
 def getBinanceExchange():
     """Gets ccxt class for binance exchange"""
     exchange_id = 'binance'
@@ -30,17 +37,25 @@ def getBinanceExchange():
         })
 
 
+def get_empty_ohlcv_df():
+    return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
+
+
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
     Attempts to retrieve data from an exchange for a specified symbol
     
-    Returns data in a pandas dataframe
+    Returns data retrieved from ccxt exchange in a pandas dataframe
+    with Symbol and Is_Final_Row columns
     Parameters:
         symbol (str) -- symbol to gather market data on (e.g. "BCH/BTC")
         exchange (ccxt class) -- ccxt exchange to retrieve data from. Default is binance
         timeFrame (str) -- timeframe for which to retrieve the data
         start_time_ms (int) -- UTC timestamp in milliseconds
         last_request_time_ms (timestamp ms) -- timestamp of last call used to throttle number of calls
+    
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
     """
     if type(start_time_ms) == str:
         start_time_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(start_time_ms))
@@ -58,6 +73,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     data = exchange.fetch_ohlcv(symbol, timeFrame, since=start_time_ms)
     df = pd.DataFrame(data, columns=header).set_index('Timestamp')
     df['Symbol'] = symbol
+    df['Is_Final_Row'] = np.nan
     return df
 
 
@@ -87,101 +103,197 @@ def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
     return ret
 
 
-def get_DataFrame(symbol_list, exchange=None, from_date=None, end_date=None, ret_as_list=False, filename = "MarketData", timeframe = '1d', max_calls=10):
+def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date_str='1/1/2050', ret_as_list=False, timeframe = '1d', max_calls=10):
     """gets a dataframe in the expected format
     
     Parameters:
         symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
         exchange (ccxt class) -- ccxt exchange to retrieve data from
-        from_date (str) -- string representation of start date timeframe
-        end_date (str) -- string representation of end date timeframe
+        from_date_str (str) -- string representation of start date timeframe
+        end_date_str (str) -- string representation of end date timeframe
         ret_as_list (bool) -- boolean indicating to return list of dfs or single df
-        fileName (str) -- beginning of the file name
         timeFrame (str) -- timeframe to pull
         maxCalls (int) -- max number of data pulls for a given currency
+                            intended for use as safety net to prevent too many calls
+
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
     """
     if ret_as_list:
         return_df = []
     else:
         return_df = pd.DataFrame()
-        
+    connection = database.create_connection()
+
+    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str)
+
+    from_date = parser.parse(from_date_str)
+    end_date = parser.parse(end_date_str)
+
+    from_date_ms = convert_datetime_to_UTC_Ms(from_date)
+    end_date_ms = convert_datetime_to_UTC_Ms(end_date)
+
     for symbol in symbol_list:
-        df = get_saved_data(symbol, from_date, end_date)
-        if df.empty and exchange is not None and from_date is not None:
-            df = retrieve_data_from_exchange(symbol, exchange, from_date, end_date, timeframe, max_calls)
-            if not df.empty:
-                save_data(df, symbol, filename)
-        if df.empty: #enhancement is to call check_retrival_for_errors(df) for warnings/errors regarding data retrieval
-            print('Failed to retrieve',symbol,'data')
-        return_df.append(df)
+        symbol_df = df.loc[df['Symbol'] == symbol]
+        if symbol_df.empty and exchange is not None:
+            symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms, timeframe, max_calls)
+            if symbol_df.empty:
+                print('Failed to retrieve',symbol,'data')
+                continue
+            symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
+            symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
+        elif exchange is not None:
+            first_df_timestamp = symbol_df.index.min().item() #.item() gets us the native python number type instead of the numpy type
+            need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1)
+            if need_prior_data:
+                first_df_timestamp -= 1 #we subtract 1 to the timestamp to pull the up to this timestamp which avoids duplicates
+                first_df_timestamp_str = datetime.fromtimestamp(first_df_timestamp / 1000, tz.tzutc())
+                print(f'Need earlier data for {symbol}. Retreiving data from {from_date_str} ({from_date_ms}) to {first_df_timestamp_str} ({first_df_timestamp})')
+                prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
+                prior_data.to_sql('OHLCV_DATA', connection, if_exists='append')
+                symbol_df = symbol_df.append(prior_data).sort_index() #we sort index when appending prior data so it doesn't append to the end
+            last_df_timestamp = symbol_df.index.max().item()
+            two_days_ms = 2 * 24 * 60 * 60 * 1000
+            last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
+            need_later_data = last_df_timestamp != end_date_ms and symbol_df.at[last_df_timestamp,'Is_Final_Row'] != 1 and last_timestamp_is_older_than_two_days
+            if need_later_data:
+                last_df_timestamp += 1 #we add 1 to the timestamp to pull the next timestamp data and to avoid duplicates
+                last_df_timestamp_str = datetime.fromtimestamp(last_df_timestamp / 1000, tz.tzutc())
+                print(f'Need later data for {symbol}. Retreiving data from {last_df_timestamp_str} ({last_df_timestamp}) to {end_date_str} ({end_date_ms})')
+                later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
+                later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
+                symbol_df = symbol_df.append(later_data)
+        else:
+            raise NameError('Data is missing for',symbol,'but no exchange was passed in to retrieve data from')
+        return_df = return_df.append(set_data_timestamp_index(symbol_df))
+    connection.close()
     return return_df
 
 
-def retrieve_data_from_exchange(symbol, exchange, from_date, end_date=None, timeframe = '1d', max_calls=10):
-    from_date_as_ms_timestamp = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date))
+def populate_is_final_column(df, from_date_ms, end_date_ms, timeframe):
+    """populates Is_Final_Column to indicate that no past or future data
+    exists past that row
+    
+    Parameters:
+        df (DataFrame) -- dataframe for which to popualte the column
+        from_date_ms (int) -- from date in milliseconds
+        end_date_ms (int) -- end date in milliseconds
+        timeframe (str) -- timeframe that data is in (e.g. 1h, 1d, 1m, etc.)
+    
+    Returns:
+        DataFrame: updated DataFrame (note the input DataFrame is modified)
+    """
+    #if our from date is less than one bar behind our earliest data then there is no previous data
+    if from_date_ms < (df.index.min() - timeframe_map_ms[timeframe]): 
+        df.at[df.index.min(),'Is_Final_Row'] = 1
+    two_days_ms = 2 * timeframe_map_ms[timeframe]
+    end_date_is_older_than_two_days = end_date_ms < (convert_datetime_to_UTC_Ms() - two_days_ms)
+    #if our end date is greater than one bar past our latest data then this is no future data
+    if end_date_ms > (df.index.max() + timeframe_map_ms[timeframe]) and end_date_is_older_than_two_days:
+        df.at[df.index.max(),'Is_Final_Row'] = 1
+    return df
+    
+
+def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None, timeframe = '1d', max_calls=10):
+    """Retrives data from ccxt exchange
+    
+    pulls data from ccxt exchange in 500 bar increments until we have all the data
+    betwen from_date_ms and end_date_ms or we hit max_calls. Also calls
+    populate_is_final_column to populate the Is_Final_Column of the DataFrame
+    Parameters:
+        symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
+        exchange (ccxt class) -- ccxt exchange to retrieve data from
+        from_date_ms (int) -- from date in utc milliseconds
+        end_date_ms (int) -- end date in utc milliseconds
+        timeFrame (str) -- timeframe to pull (e.g. '1d' for day)
+        maxCalls (int) -- max number of data pulls for a given currency
+                            intended for use as safety net to prevent too many calls
+    
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
+    """
+    if not end_date_ms:
+        convert_datetime_to_UTC_Ms()
     sleep(exchange.rateLimit / 1000)
     call_count = 1
-    print('Fetching',symbol,'market data from',exchange,'. call #',call_count,sep='')
-    df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, from_date_as_ms_timestamp)
+    print(f'Fetching {symbol} market data from {exchange}. call #{call_count}')
+    df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, from_date_ms)
     if df.empty:
         print('Failed to retrieve',symbol,'data')
         return pd.DataFrame()
     retdf = df
-    while (len(df) == 500 and call_count < max_calls):
+    while (len(df) == 500 and call_count < max_calls and retdf.index.max() < end_date_ms):
         call_count += 1
-        new_from_date=df.index[-1]
+        new_from_date = df.index[-1].item()
         sleep(exchange.rateLimit / 1000)
-        print('Fetching ',symbol,' market data. call #',call_count,sep='')
+        print(f'Fetching {symbol} market data from {exchange}. call #{call_count}')
         df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, new_from_date)
         retdf = retdf.append(df)
-    #Commenting out becuase we wouldn't know at the current time of
-    #evaluation if a currency is delisted in the future
-    # if retdf.loc[includeStamp:,:].empty:
-    #     print(symbol,'data did not include',includeDate,'data not saved.')
-    #     if attempt >= maxCalls:
-    #         print('Maximum data retrivals (',maxCalls,') hit.', sep='')
-    #     continue
-    return retdf
-
-
-def get_saved_data(symbol, from_date=None, end_date=None):
-    symbol = symbol.replace('/', '')
-    search_name = saved_data_directory + '*' + symbol + '.csv'
-    try:
-        file = glob.glob(search_name)[0]
-    except IndexError:
+    if len(df) == 500 and call_count >= max_calls and retdf.index.max() < end_date_ms:
+        print(f'Maximum data retrivals ({max_calls}) hit.')
         return pd.DataFrame()
+    populate_is_final_column(retdf, from_date_ms, end_date_ms, timeframe)
+    return retdf.loc[from_date_ms:end_date_ms,:]
     
-    df = pd.read_csv(file)
-    df = set_data_timestamp_index(df)
-    return df.loc[from_date:end_date]
+
+def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=None):
+    """Attempts to retrive data from saved database
+    
+    Parameters:
+        symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
+        connection (obj) -- connectiont to sql database
+        from_date_str (str) -- string representation of start date timeframe
+        end_date_str (str) -- string representation of end date timeframe
+
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
+    """
+    symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
+    start_condition = ''
+    end_condition = ''
+    if from_date_str:
+        start_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date_str))
+        start_condition = f'and TIMESTAMP >= {start_date}'
+    if end_date_str:
+        end_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date_str))
+        end_condition = f'and TIMESTAMP <= {end_date}'
+    query = f"""SELECT * FROM OHLCV_DATA 
+        WHERE {symbol_condition}
+        {start_condition}
+        {end_condition}"""
+    try:
+        df = pd.read_sql_query(query, connection)
+    except Exception as e:
+        print('Query failed: \n' + query)
+        print(e)
+        return get_empty_ohlcv_df()
+    df['Is_Final_Row'] = pd.to_numeric(df['Is_Final_Row'], errors='coerce')
+    return df.set_index('Timestamp')
 
 
-def set_data_timestamp_index(df):
-    col = None
-    unit = None
-    if ("Date" in df.columns):
-        col = "Date"
-    if ("Timestamp" in df.columns):
-        col = "Timestamp"
-        unit = 'ms'
-    df.loc[:,col] = pd.to_datetime(df.loc[:,col], unit=unit)
-    if col is not None:
-        return df.set_index(col)
 
+def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
+    """converts column with lable "Timestamp" of a DataFrame
+    to a datetime and makes it the index
 
-def save_data(df, symbol, filename, show_output=True):
-    file = filename + symbol + ".csv"
-    file = file.replace("/", "")
-    file = saved_data_directory + file
-    df.to_csv(file)
-    if show_output:
-        print('data saved successfully to "',file,'"',sep='')
+    Args:
+        df (DataFrame): Pandas dataframe
+
+    Returns:
+        DataFrame: new Pandas DataFrame with updated index
+    """
+    retdf = df.copy()
+    if retdf.empty:
+        return retdf
+    if retdf.index.name != 'Timestamp':
+        retdf = retdf.set_index('Timestamp')
+    retdf.index = pd.to_datetime(retdf.index, unit=unit)
+    return retdf
 
 
 def get_UTC_datetime(datetime_string=None):
     if datetime_string is None:
-        return convert_datetime_to_UTC_Ms()
+        return datetime.now()
     return parser.parse(datetime_string).replace(tzinfo = tz.tzutc())
 
 
@@ -193,6 +305,6 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 
 if __name__ == '__main__':
     exchange = getBinanceExchange()
-    symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['ETH/BTC'], exchange, '7/1/18')
+    #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
+    df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20')
     print(df)
