@@ -16,7 +16,6 @@ class Testgcd(unittest.TestCase):
 
 
      def test_get_DataFrame(self):
-          #test 1
           #verifies that retriving the data from online source and from saved file yield the same dataframe
           if os.path.exists('test\\test_ohlcv_sqlite.db'):
                os.remove('test\\test_ohlcv_sqlite.db')

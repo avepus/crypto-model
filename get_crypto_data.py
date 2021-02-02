@@ -45,13 +45,17 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
     """
     Attempts to retrieve data from an exchange for a specified symbol
     
-    Returns data in a pandas dataframe
+    Returns data retrieved from ccxt exchange in a pandas dataframe
+    with Symbol and Is_Final_Row columns
     Parameters:
         symbol (str) -- symbol to gather market data on (e.g. "BCH/BTC")
         exchange (ccxt class) -- ccxt exchange to retrieve data from. Default is binance
         timeFrame (str) -- timeframe for which to retrieve the data
         start_time_ms (int) -- UTC timestamp in milliseconds
         last_request_time_ms (timestamp ms) -- timestamp of last call used to throttle number of calls
+    
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
     """
     if type(start_time_ms) == str:
         start_time_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(start_time_ms))
@@ -99,7 +103,7 @@ def getAllSymbolsForQuoteCurrency(quoteSymbol, exchange):
     return ret
 
 
-def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date_str='1/1/2050', ret_as_list=False, filename = "MarketData", timeframe = '1d', max_calls=10):
+def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date_str='1/1/2050', ret_as_list=False, timeframe = '1d', max_calls=10):
     """gets a dataframe in the expected format
     
     Parameters:
@@ -108,10 +112,12 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
         from_date_str (str) -- string representation of start date timeframe
         end_date_str (str) -- string representation of end date timeframe
         ret_as_list (bool) -- boolean indicating to return list of dfs or single df
-        fileName (str) -- beginning of the file name
         timeFrame (str) -- timeframe to pull
         maxCalls (int) -- max number of data pulls for a given currency
                             intended for use as safety net to prevent too many calls
+
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
     """
     if ret_as_list:
         return_df = []
@@ -173,6 +179,9 @@ def populate_is_final_column(df, from_date_ms, end_date_ms, timeframe):
         from_date_ms (int) -- from date in milliseconds
         end_date_ms (int) -- end date in milliseconds
         timeframe (str) -- timeframe that data is in (e.g. 1h, 1d, 1m, etc.)
+    
+    Returns:
+        DataFrame: updated DataFrame (note the input DataFrame is modified)
     """
     #if our from date is less than one bar behind our earliest data then there is no previous data
     if from_date_ms < (df.index.min() - timeframe_map_ms[timeframe]): 
@@ -186,6 +195,23 @@ def populate_is_final_column(df, from_date_ms, end_date_ms, timeframe):
     
 
 def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None, timeframe = '1d', max_calls=10):
+    """Retrives data from ccxt exchange
+    
+    pulls data from ccxt exchange in 500 bar increments until we have all the data
+    betwen from_date_ms and end_date_ms or we hit max_calls. Also calls
+    populate_is_final_column to populate the Is_Final_Column of the DataFrame
+    Parameters:
+        symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
+        exchange (ccxt class) -- ccxt exchange to retrieve data from
+        from_date_ms (int) -- from date in utc milliseconds
+        end_date_ms (int) -- end date in utc milliseconds
+        timeFrame (str) -- timeframe to pull (e.g. '1d' for day)
+        maxCalls (int) -- max number of data pulls for a given currency
+                            intended for use as safety net to prevent too many calls
+    
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
+    """
     if not end_date_ms:
         convert_datetime_to_UTC_Ms()
     sleep(exchange.rateLimit / 1000)
@@ -210,12 +236,23 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     return retdf.loc[from_date_ms:end_date_ms,:]
     
 
-def get_saved_data(symbol_list, connection, start_date_str=None, end_date_str=None):
+def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=None):
+    """Attempts to retrive data from saved database
+    
+    Parameters:
+        symbol_list (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
+        connection (obj) -- connectiont to sql database
+        from_date_str (str) -- string representation of start date timeframe
+        end_date_str (str) -- string representation of end date timeframe
+
+    Returns:
+        DataFrame: retrived data in Pandas DataFrame with ms timestamp index
+    """
     symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
     start_condition = ''
     end_condition = ''
-    if start_date_str:
-        start_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(start_date_str))
+    if from_date_str:
+        start_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date_str))
         start_condition = f'and TIMESTAMP >= {start_date}'
     if end_date_str:
         end_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date_str))
