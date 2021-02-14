@@ -3,3 +3,4 @@
 # Except these file
 !.gitignore
 !test_get_crypto_data.py
+!__init__.py

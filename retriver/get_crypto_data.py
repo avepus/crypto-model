@@ -15,7 +15,7 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import glob
-import database
+import rba_tools.retriver.database as database
 import sqlite3
 
 #global variables
