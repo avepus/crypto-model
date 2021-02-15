@@ -7,9 +7,9 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(1,parentdir) 
 
-import get_crypto_data as gcd
-import database
-database.database_file = 'test\\test_ohlcv_sqlite.db'
+import rba_tools.retriver.get_crypto_data as gcd
+import rba_tools.retriver.database as database
+database.database_file = 'test_ohlcv_sqlite.db'
 
 class Testgcd(unittest.TestCase):
 
