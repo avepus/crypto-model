@@ -6,8 +6,6 @@ import argparse
 import backtrader as bt
 import backtrader.feeds as btfeeds
 
-import quantstats as qs
-
 import pandas as pd
 import rba_tools.retriver.get_crypto_data as gcd
 
@@ -74,12 +72,6 @@ def runstrat(print_df=False, plot=True):
 
     # Run over everything
     strats = cerebro.run()
-
-    df_values = pd.DataFrame(strats[0].analyzers.getbyname("cash_market").get_analysis()).T
-
-    df_values = df_values.iloc[:, 1]
-    qs.extend_pandas()
-    qs.reports.html(df_values, "SPY", output="qs.png")
 
     # Plot the result
     if plot:
