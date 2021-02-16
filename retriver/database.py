@@ -1,7 +1,8 @@
 import sqlite3
 from sqlite3 import Error
+from pathlib import Path
 
-database_file = r'ohlcv_data\ohlcv_sqlite.db'
+database_file = str(Path(__file__).parent) + '\\ohlcv_data\\ohlcv_sqlite.db'
 
 def create_connection():
     """create a database connection to the SQLite database
@@ -14,6 +15,7 @@ def create_connection():
         connection = sqlite3.connect(database_file)
     except Error as err:
         print(err)
+        print(type(err))
     return connection
 
 def create_ohlcv_table(connection):

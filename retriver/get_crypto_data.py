@@ -18,9 +18,6 @@ import glob
 import rba_tools.retriver.database as database
 import sqlite3
 
-#global variables
-#saved_data_directory = 'ohlcv_data\\'
-
 timeframe_map_ms = { 
         '1m': 60000,
         '1h': 3600000,
@@ -142,6 +139,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
                 continue
             symbol_df.to_sql('OHLCV_DATA', connection, if_exists='append')
             symbol_df.index = pd.to_datetime(symbol_df.index, unit='ms')
+
         elif exchange is not None:
             first_df_timestamp = symbol_df.index.min().item() #.item() gets us the native python number type instead of the numpy type
             need_prior_data = (first_df_timestamp != from_date_ms) and (symbol_df.at[first_df_timestamp,'Is_Final_Row'] != 1)
@@ -152,6 +150,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
                 prior_data = retrieve_data_from_exchange(symbol, exchange, from_date_ms, first_df_timestamp, timeframe, max_calls)
                 prior_data.to_sql('OHLCV_DATA', connection, if_exists='append')
                 symbol_df = symbol_df.append(prior_data).sort_index() #we sort index when appending prior data so it doesn't append to the end
+
             last_df_timestamp = symbol_df.index.max().item()
             two_days_ms = 2 * 24 * 60 * 60 * 1000
             last_timestamp_is_older_than_two_days = last_df_timestamp < (convert_datetime_to_UTC_Ms() - two_days_ms)
@@ -163,6 +162,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
                 later_data = retrieve_data_from_exchange(symbol, exchange, last_df_timestamp, end_date_ms, timeframe, max_calls)
                 later_data.to_sql('OHLCV_DATA', connection, if_exists='append')
                 symbol_df = symbol_df.append(later_data)
+
         else:
             raise NameError('Data is missing for',symbol,'but no exchange was passed in to retrieve data from')
         return_df = return_df.append(set_data_timestamp_index(symbol_df))
