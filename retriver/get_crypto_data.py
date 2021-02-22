@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-"""
+"""Retrives and stores data in a local sqlite database
+
 Created on Sat Apr 25 22:09:42 2020
 
-@author: Avery And Jake
-
+@author: Avery
 
 """
 
 import ccxt
 import pandas as pd
 import numpy as np
-import numpy
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
-import glob
 import rba_tools.retriver.database as database
 import sqlite3
 
