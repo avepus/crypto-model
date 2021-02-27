@@ -27,6 +27,7 @@ class CashMarket(bt.analyzers.Analyzer):
 
 class MaCrossStrategy(bt.Strategy):
 
+
     def __init__(self):
         ma_fast = bt.ind.SMA(period = 10)
         ma_slow = bt.ind.SMA(period = 50)
