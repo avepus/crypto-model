@@ -49,17 +49,40 @@ class backtrader_set():
             )
         ])
     
-    def get_trades_from_cerebro_run(self):
-        #gets the trade array from the return of cerebro.run()
-        data = None
-        for strat in self.cerebro_run_data[0].stats:
-            print(strat)
-            if isinstance(strat, bt.observers.trades.DataTrades):
-                for line in strat.lines:
-                    npary = np.frombuffer(line.array)
-                    if len(npary[~np.isnan(npary)]) > 0:
-                        data = npary
-        return data
+def get_trades_from_cerebro_run(cerebro_run):
+    #gets the trade array from the return of cerebro.run()
+    data = None
+    for strat in cerebro_run[0].stats:
+        if isinstance(strat, bt.observers.trades.DataTrades):
+            for line in strat.lines:
+                npary = np.frombuffer(line.array)
+                if len(npary[~np.isnan(npary)]) > 0:
+                    data = npary
+    return data
         
+def get_pos_analysis(cerebro_run):
+    #gets the PositionsValue analyzer raises warning if more than one found
+    analysis = None
+    count = 0
+    for analyzer in cerebro_run[0].analyzers:
+        if isinstance(analyzer, bt.analyzers.PositionsValue):
+            count += 1
+            analysis = analyzer.get_analysis().copy()
+    if count > 1:
+        raise IndexError('Multiple PositionsValue analyzers found')
+    if analysis is None:
+        raise IndexError('PositionsValue not found')
+    return analysis
 
-    
+def get_cash_including_position(cerebro_run):
+    #this assumes that PositionsValue analyzer exists with parameter cash=True (this is not the default) and headers=False (this is the default)
+    pos_analysis = get_pos_analysis(cerebro_run)
+    data = []
+    for key, value in pos_analysis.items():
+        data.append(sum(value))
+    return np.round_(np.array(data),2)
+
+def get_percent_cash_change(cerebro_run):
+    cash_vals = get_cash_including_position(cerebro_run)
+    start_val = cash_vals[0]
+    return np.round((cash_vals / start_val - 1) * 100,2)
