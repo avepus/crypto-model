@@ -15,6 +15,7 @@ Created on Sun Feb 21 18:05:42 2021
 """
 
 import backtrader as bt
+from backtrader.utils import num2date
 import rba_tools as rba
 import dash_html_components as html
 import dash_core_components as dcc
@@ -61,7 +62,7 @@ def get_trades_from_cerebro_run(cerebro_run):
     return data
         
 def get_pos_analysis(cerebro_run):
-    #gets the PositionsValue analyzer raises warning if more than one found
+    #gets the PositionsValue analyzer. Raises IndexError if none or more than one found
     analysis = None
     count = 0
     for analyzer in cerebro_run[0].analyzers:
@@ -82,7 +83,13 @@ def get_cash_including_position(cerebro_run):
         data.append(sum(value))
     return np.round_(np.array(data),2)
 
-def get_percent_cash_change(cerebro_run):
+def get_percent_cash_change(cerebro_run, decimals=2):
     cash_vals = get_cash_including_position(cerebro_run)
     start_val = cash_vals[0]
-    return np.round((cash_vals / start_val - 1) * 100,2)
+    return np.round((cash_vals / start_val - 1) * 100, decimals)
+
+def get_datetime_array(cerebro_run):
+    #retrieves a numpy array of datetime objects for the backtested time period
+    datetime_as_float_ary = cerebro_run[0].lines.datetime.plot()
+    datetime_obj_list = [num2date(float_date) for float_date in datetime_as_float_ary]
+    return np.array(datetime_obj_list)

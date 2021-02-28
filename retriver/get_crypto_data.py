@@ -222,7 +222,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     retdf = df
     while (len(df) == 500 and call_count < max_calls and retdf.index.max() < end_date_ms):
         call_count += 1
-        new_from_date = df.index[-1].item()
+        new_from_date = df.index[-1].item() + 1 #add 1 to prevent retrival of the same date
         sleep(exchange.rateLimit / 1000)
         print(f'Fetching {symbol} market data from {exchange}. call #{call_count}')
         df = fetch_ohlcv_dataframe_from_exchange(symbol, exchange, timeframe, new_from_date)

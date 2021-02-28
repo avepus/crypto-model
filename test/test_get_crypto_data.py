@@ -1,15 +1,13 @@
 import unittest
 import pandas as pd
 #The lines below allow us to import from the parent directory in a hacky way. Technically https://stackoverflow.com/a/50194143 is the "most right" way to do this
-import os,sys,inspect
 import numpy as np
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(1,parentdir) 
-
+import os
 import rba_tools.retriver.get_crypto_data as gcd
 import rba_tools.retriver.database as database
-database.database_file = 'test_ohlcv_sqlite.db'
+from pathlib import Path
+db_file = str(Path(__file__).parent) + '\\test_ohlcv_sqlite.db'
+database.database_file = db_file
 
 class Testgcd(unittest.TestCase):
 
@@ -17,27 +15,21 @@ class Testgcd(unittest.TestCase):
 
      def test_get_DataFrame(self):
           #verifies that retriving the data from online source and from saved file yield the same dataframe
-          if os.path.exists('test\\test_ohlcv_sqlite.db'):
-               os.remove('test\\test_ohlcv_sqlite.db')
+          if os.path.exists(db_file):
+               os.remove(db_file)
           binance = gcd.getBinanceExchange()
           eth_btc_data_from_exchange = gcd.get_DataFrame(['ETH/BTC'], binance, '8/1/18', '12/1/20')
           eth_btc_saved_data = gcd.get_DataFrame(['ETH/BTC'], binance, '8/1/18', '12/1/20')
 
           pd.testing.assert_frame_equal(eth_btc_data_from_exchange, eth_btc_saved_data)
 
+
           #verify that the data retrieved actually matches with a subset of that historic data.
           #Returning nothing matches nothing so this validates that we are actually returning data
-          eth_btc_data = [[1533081600000,0.055818,0.056429,0.054463,0.05525,106706.644,'ETH/BTC',np.nan],
-                          [1533168000000,0.05525,0.055589,0.054143,0.05455,102662.715,'ETH/BTC',np.nan],
-                          [1533254400000,0.05455,0.056501,0.0542,0.056334,125645.875,'ETH/BTC',np.nan]]
-          eth_aug_1st_2nd_3rd = pd.DataFrame(eth_btc_data,
-                                 columns=['Timestamp','Open','High','Low','Close','Volume','Symbol','Is_Final_Row'])
-          
+          csv_file = str(Path(__file__).parent) + '\\eth_test_data.csv'
+          expected_dataframe = pd.read_csv(csv_file, parse_dates=True, index_col='Timestamp')
 
-          eth_aug_1st_2nd_3rd = gcd.set_data_timestamp_index(eth_aug_1st_2nd_3rd)
-          saved_eth_aug_1st_2nd_3rd = gcd.get_DataFrame(['ETH/BTC'], binance, '8/1/18', '8/3/18')
-
-          pd.testing.assert_frame_equal(eth_aug_1st_2nd_3rd, saved_eth_aug_1st_2nd_3rd)
+          pd.testing.assert_frame_equal(eth_btc_saved_data, expected_dataframe)
 
 
           #verify that we will pull previous data if it's missing

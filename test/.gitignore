@@ -4,3 +4,4 @@
 !.gitignore
 !test_get_crypto_data.py
 !__init__.py
+!eth_test_data.csv
