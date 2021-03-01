@@ -50,15 +50,16 @@ class backtrader_set():
             )
         ])
     
-def get_trades_from_cerebro_run(cerebro_run):
-    #gets the trade array from the return of cerebro.run()
+def get_trades_from_cerebro_run(cerebro_run, trade_type='long'):
+    #get trades. Long is 'long' and shorts is 'short'. This is unconfirmed. Need to verify
     data = None
     for strat in cerebro_run[0].stats:
         if isinstance(strat, bt.observers.trades.DataTrades):
-            for line in strat.lines:
-                npary = np.frombuffer(line.array)
-                if len(npary[~np.isnan(npary)]) > 0:
-                    data = npary
+            trades = np.frombuffer(strat.lines[0].array)
+            if trade_type == 'long':
+                return trades[:int(len(trades) / 2)]
+            else:
+                return trades[int(len(trades) / 2):]
     return data
         
 def get_pos_analysis(cerebro_run):
@@ -79,7 +80,7 @@ def get_cash_including_position(cerebro_run):
     #this assumes that PositionsValue analyzer exists with parameter cash=True (this is not the default) and headers=False (this is the default)
     pos_analysis = get_pos_analysis(cerebro_run)
     data = []
-    for key, value in pos_analysis.items():
+    for value in pos_analysis.values():
         data.append(sum(value))
     return np.round_(np.array(data),2)
 
