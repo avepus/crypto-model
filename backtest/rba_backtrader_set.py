@@ -50,17 +50,18 @@ class backtrader_set():
             )
         ])
     
-def get_trades_from_cerebro_run(cerebro_run, trade_type='long'):
-    #get trades. Long is 'long' and shorts is 'short'. This is unconfirmed. Need to verify
-    data = None
+def get_trades_from_cerebro_run(cerebro_run):
+    #get trades. Arrays of this oberserver are double length for some reason
+    array_list = []
     for strat in cerebro_run[0].stats:
-        if isinstance(strat, bt.observers.trades.DataTrades):
-            trades = np.frombuffer(strat.lines[0].array)
-            if trade_type == 'long':
-                return trades[:int(len(trades) / 2)]
-            else:
-                return trades[int(len(trades) / 2):]
-    return data
+        if isinstance(strat, bt.observers.trades.Trades):
+            for line in strat.lines:
+                pnl_data = np.frombuffer(line.array)
+                np.nan_to_num(pnl_data, copy=False, nan=0)
+                array_list.append(pnl_data)
+    summed_ary = sum(array_list)
+    summed_ary[summed_ary == 0] = np.nan
+    return summed_ary[:int(len(summed_ary) / 2)] #not sure what the deal is with the double sized array but this seems to work
         
 def get_pos_analysis(cerebro_run):
     #gets the PositionsValue analyzer. Raises IndexError if none or more than one found
@@ -94,3 +95,12 @@ def get_datetime_array(cerebro_run):
     datetime_as_float_ary = cerebro_run[0].lines.datetime.plot()
     datetime_obj_list = [num2date(float_date) for float_date in datetime_as_float_ary]
     return np.array(datetime_obj_list)
+
+def get_buy_sell_from_cerebro_run(cerebro_run, trade_type='buy'):
+    #get executed buy or sell orders. type can switch between buy and sell
+    data = None
+    for strat in cerebro_run[0].getobservers():
+        if isinstance(strat, bt.observers.buysell.BuySell):
+            line = 0 if trade_type == 'buy' else 1
+            data = np.frombuffer(strat.lines[line].array)
+    return data[:int(len(data) / 2)] #not sure what the deal is with the double sized array but this seems to work
