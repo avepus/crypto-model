@@ -22,6 +22,7 @@ import dash_core_components as dcc
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 class backtrader_set():
@@ -104,3 +105,41 @@ def get_buy_sell_from_cerebro_run(cerebro_run, trade_type='buy'):
             line = 0 if trade_type == 'buy' else 1
             data = np.frombuffer(strat.lines[line].array)
     return data[:int(len(data) / 2)] #not sure what the deal is with the double sized array but this seems to work
+
+def get_ohlcv_data_from_cerebro_run(cerebro_run):
+    #get ohlcv dataframe from the data in the run
+    data = cerebro_run[0].datas[0]
+    start = 0
+    end = len(data)
+    return pd.DataFrame({
+        'Open' : data.open.plotrange(start,end),
+        'High' : data.high.plotrange(start,end),
+        'Low' : data.low.plotrange(start,end),
+        'Close' : data.close.plotrange(start,end),
+        'Volume' : data.volume.plotrange(start,end)
+        })
+
+def summarize_cerebro_run(cerebro_run):
+    #get pandas dataframe of summarized data
+    index = get_datetime_array(cerebro_run)
+    ohlcv_df = get_ohlcv_data_from_cerebro_run(cerebro_run)
+    data = { 'Open' :ohlcv_df['Open'].values,
+             'High' : ohlcv_df['High'].values,
+             'Low' : ohlcv_df['Low'].values,
+             'Close' : ohlcv_df['Close'].values,
+             'Volume' : ohlcv_df['Volume'].values,
+             'cash' : get_cash_including_position(cerebro_run),
+             'percent_change' : get_percent_cash_change(cerebro_run),
+             'trades' : get_trades_from_cerebro_run(cerebro_run),
+             'buy' : get_buy_sell_from_cerebro_run(cerebro_run, trade_type='buy'),
+             'sell' : get_buy_sell_from_cerebro_run(cerebro_run, trade_type='sell')
+            }
+    return pd.DataFrame(data=data, index=index) 
+
+def get_candlestick_plot(data):
+    #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
+    return go.Candlestick(x=data.index,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'])

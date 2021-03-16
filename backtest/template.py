@@ -73,7 +73,7 @@ def runstrat(print_df=False, plot=True):
 
     # Plot the result
     if plot:
-        cerebro.plot(style='bar')
+        cerebro.plot(numfigs=2, style='bar')
 
 
 if __name__ == '__main__':
