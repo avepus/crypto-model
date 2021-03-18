@@ -17,25 +17,81 @@ Created on Sun Feb 21 18:05:42 2021
 import backtrader as bt
 from backtrader.utils import num2date
 import rba_tools as rba
+import rba_tools.retriver.get_crypto_data as gcd
 import dash_html_components as html
 import dash_core_components as dcc
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from dateutil import parser
 
+class MaCrossStrategy(bt.Strategy):
+
+    def __init__(self):
+        ma_fast = bt.ind.SMA(period = 10)
+        ma_slow = bt.ind.SMA(period = 50)
+
+        self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
+
+    def next(self):
+        if not self.position:
+            if self.crossover > 0:
+                self.buy()
+        elif self.crossover < 0:
+            self.close()
 
 class backtrader_set():
 
-    def __init__(self):
-        self.cerebro_run_data = None #placeholder
-        df = pd.DataFrame({
-            "Fruit": ["Apples", "Oranges", "Bananas", "Apples", "Oranges", "Bananas"],
-            "Amount": [4, 1, 2, 2, 4, 5],
-            "City": ["SF", "SF", "SF", "Montreal", "Montreal", "Montreal"]
-            })
+    def __init__(self, symbols, strategy, sizer, sizer_param, start_date_str, end_date_str, exchange=None, starting_cash=1000.0):
+        """
+        Creates a backtrader_set instance for retriving, running analysis, and displaying results
         
-        self.fig = px.bar(df, x="Fruit", y="Amount", color="City", barmode="group")
+        Parameters:
+            symbols (list or str) -- symbols to run over
+            strategy (backtrader.analyzers.Analyzer) -- backtrader strategy to run on the data
+            sizer (bt.sizers.*) -- backtrader sizer to define size of trades
+            sizer_param (any) -- parameter for sizer
+            start_date_str (str) -- start date of analysis time period as a string
+            end_date_str (str) -- end date of analysis time period as a string
+            exchange (ccxt class) -- ccxt exchange to retrieve data from. Default is binance
+            starting_cash (float) -- starting broker cash
+        """
+        if type(symbols) == str:
+            symbols = [symbols]
+        self.symbol_list = symbols
+
+        self.strategy = strategy
+        self.start_date_str = start_date_str
+        self.end_date_str = end_date_str
+
+        if exchange:
+            self.exchange = exchange
+        else:
+            self.exchange = gcd.getBinanceExchange()
+        
+        self.starting_cash = starting_cash
+
+        self.cerebro_list = []
+        self.cerebro_return_list = []
+        
+        
+
+    def run(self):
+        """runs strategy over all symbols"""
+        ohlcv_df_list = gcd.get_DataFrame(self.symbol_list, self.exchange, self.start_date_str, self.end_date_str, ret_as_list=True, timeframe='1d')
+        for index in range(len(self.symbol_list)):
+            cerebro = bt.Cerebro()
+            data = bt.feeds.PandasData(dataname=ohlcv_df_list[index], nocase=True)
+            cerebro.adddata(data)
+            cerebro.addstrategy(self.strategy)
+
+            cerebro.broker.setcash(self.starting_cash)
+
+            self.cerebro_list.append(cerebro)
+            self.cerebro_return_list.append(cerebro.run())
+            
+
 
     def get_app_layout(self):
         return html.Div(children=[
@@ -43,6 +99,7 @@ class backtrader_set():
 
             html.Div(children='''
                 Dash: A web application framework for Python.
+                
             '''),
 
             dcc.Graph(
@@ -143,3 +200,7 @@ def get_candlestick_plot(data):
             high=data['High'],
             low=data['Low'],
             close=data['Close'])
+
+if __name__ == '__main__':
+    myset = backtrader_set(['ETH/BTC'], MaCrossStrategy, bt.sizers.PercentSizer, 10, '1/1/18', '1/1/20')
+    myset.run()

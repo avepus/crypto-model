@@ -163,7 +163,10 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
 
         else:
             raise NameError('Data is missing for',symbol,'but no exchange was passed in to retrieve data from')
-        return_df = return_df.append(set_data_timestamp_index(symbol_df))
+        if ret_as_list:
+            return_df.append(set_data_timestamp_index(symbol_df))
+        else:
+            return_df = return_df.append(set_data_timestamp_index(symbol_df))
     connection.close()
     return return_df
 
