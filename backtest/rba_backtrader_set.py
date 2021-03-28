@@ -73,10 +73,10 @@ class backtrader_set():
         self.starting_cash = starting_cash
 
         self.cerebro_list = []
-        self.cerebro_return_list = []
+        self.cerebro_run_return_list = []
+        self.current_symbol_index = 0
         
         
-
     def run(self):
         """runs strategy over all symbols"""
         ohlcv_df_list = gcd.get_DataFrame(self.symbol_list, self.exchange, self.start_date_str, self.end_date_str, ret_as_list=True, timeframe='1d')
@@ -89,11 +89,34 @@ class backtrader_set():
             cerebro.broker.setcash(self.starting_cash)
 
             self.cerebro_list.append(cerebro)
-            self.cerebro_return_list.append(cerebro.run())
-            
+            self.cerebro_run_return_list.append(cerebro.run())
+        self.set_current_ohlcv_graph()
+
+    def set_current_ohlcv_graph(self):
+        self.current_symbol_figure = self.get_current_ohlcv_graph()
+
+    def get_current_ohlcv_graph(self):
+        ohlcv_df = self.get_current_ohlcv_data()
+        return go.Figure(data=get_candlestick_plot(ohlcv_df), layout={
+                'title': self.get_current_symbol_name(),
+                #'plot_bgcolor': '#111111',
+                #'paper_bgcolor': '#111111',
+                'xaxis' : {'rangeslider': {'visible': False}}}
+                #'font': {'color': '#7FDBFF'}
+                )
+    
+    def get_current_ohlcv_data(self):
+        return get_ohlcv_data_from_cerebro_run(self.cerebro_run_return_list[self.current_symbol_index])
 
 
-    def get_app_layout(self):
+    def get_single_symbol_app_page(self, index):
+        """
+        Gets the app page setup for a single symbol
+        
+        Parameters:
+            index (int) -- index number for symbol to retrieve
+        """
+        ohlcv_df = get_ohlcv_data_from_cerebro_run(self.cerebro_run_return_list[index])
         return html.Div(children=[
             html.H1(children='Hello Dash'),
 
@@ -103,11 +126,21 @@ class backtrader_set():
             '''),
 
             dcc.Graph(
-                id='example-graph',
-                figure=self.fig
+                id='ohlcv-graph',
+                figure=go.Figure(data=get_candlestick_plot(ohlcv_df))
             )
         ])
     
+    def get_cerebro_run_data(self, index):
+        return self.cerebro_run_return_list[index]
+    
+    def get_current_symbol_name(self):
+        return self.symbol_list[self.current_symbol_index]
+
+    def get_summary_app_page(self):
+        pass
+    
+
 def get_trades_from_cerebro_run(cerebro_run):
     #get trades. Arrays of this oberserver are double length for some reason
     array_list = []
@@ -168,13 +201,15 @@ def get_ohlcv_data_from_cerebro_run(cerebro_run):
     data = cerebro_run[0].datas[0]
     start = 0
     end = len(data)
-    return pd.DataFrame({
+    index = get_datetime_array(cerebro_run)
+    return pd.DataFrame(data={
         'Open' : data.open.plotrange(start,end),
         'High' : data.high.plotrange(start,end),
         'Low' : data.low.plotrange(start,end),
         'Close' : data.close.plotrange(start,end),
         'Volume' : data.volume.plotrange(start,end)
-        })
+        },
+        index=index)
 
 def summarize_cerebro_run(cerebro_run):
     #get pandas dataframe of summarized data
