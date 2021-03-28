@@ -90,46 +90,71 @@ class backtrader_set():
 
             self.cerebro_list.append(cerebro)
             self.cerebro_run_return_list.append(cerebro.run())
-        self.set_current_ohlcv_graph()
+        self.set_current_symbol_figure()
 
-    def set_current_ohlcv_graph(self):
-        self.current_symbol_figure = self.get_current_ohlcv_graph()
-
-    def get_current_ohlcv_graph(self):
-        ohlcv_df = self.get_current_ohlcv_data()
-        return go.Figure(data=get_candlestick_plot(ohlcv_df), layout={
+    def plot_current_symbol(self):
+        """returns the current symbol figure for the Single Symbol Performance page"""
+        plots = []
+        plots.append(self.get_current_ohlcv_graph())
+        plots.append(self.get_current_symbol_buysell_graph('buy'))
+        plots.append(self.get_current_symbol_buysell_graph('sell'))
+        return go.Figure(data=plots, layout={
                 'title': self.get_current_symbol_name(),
                 #'plot_bgcolor': '#111111',
                 #'paper_bgcolor': '#111111',
                 'xaxis' : {'rangeslider': {'visible': False}}}
                 #'font': {'color': '#7FDBFF'}
                 )
+
+    def set_current_symbol_figure(self):
+        """Sets the current figure so it can be accessed/modified by the app"""
+        self.current_symbol_figure = self.plot_current_symbol()
+
+    def get_current_symbol_run_data(self):
+        return self.cerebro_run_return_list[self.current_symbol_index]
+
+    def get_current_datetime_array(self):
+        return get_datetime_array(self.get_current_symbol_run_data())
+
+    def get_current_ohlcv_graph(self):
+        ohlcv_df = self.get_current_ohlcv_data()
+        return get_candlestick_plot(ohlcv_df)
+
+    def get_current_symbol_buysell_array(self, trade_type='buy'):
+        return get_buy_sell_from_cerebro_run(self.get_current_symbol_run_data(), trade_type)
+
+    def get_current_symbol_buysell_series(self, trade_type='buy'):
+        data = self.get_current_symbol_buysell_array(trade_type)
+        index = self.get_current_datetime_array()
+        return pd.Series(data=data,index=index).dropna()
+
+    def get_current_symbol_buysell_graph(self, trade_type='buy'):
+        buysell_series = self.get_current_symbol_buysell_series(trade_type)
+        color='black'
+        if trade_type == 'sell':
+            color='white'
+        return go.Scatter(mode='markers',
+                            x=buysell_series.index,
+                            y=buysell_series.values,
+                            marker={'color' : color}
+                            )
+
+    def get_current_symbol_trades_array(self):
+        return get_trades_from_cerebro_run(self.get_current_symbol_run_data())
+
+    def get_current_symbol_trades_series(self):
+        trades = self.get_current_symbol_trades_array()
+        index = self.get_current_datetime_array()
+        return pd.Series(data=trades,index=index).dropna()
+
+
+
+
+    
+
     
     def get_current_ohlcv_data(self):
-        return get_ohlcv_data_from_cerebro_run(self.cerebro_run_return_list[self.current_symbol_index])
-
-
-    def get_single_symbol_app_page(self, index):
-        """
-        Gets the app page setup for a single symbol
-        
-        Parameters:
-            index (int) -- index number for symbol to retrieve
-        """
-        ohlcv_df = get_ohlcv_data_from_cerebro_run(self.cerebro_run_return_list[index])
-        return html.Div(children=[
-            html.H1(children='Hello Dash'),
-
-            html.Div(children='''
-                Dash: A web application framework for Python.
-                
-            '''),
-
-            dcc.Graph(
-                id='ohlcv-graph',
-                figure=go.Figure(data=get_candlestick_plot(ohlcv_df))
-            )
-        ])
+        return get_ohlcv_data_from_cerebro_run(self.get_current_symbol_run_data())
     
     def get_cerebro_run_data(self, index):
         return self.cerebro_run_return_list[index]
