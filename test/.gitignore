@@ -1,7 +1,2 @@
-# Ignore everything in this directory
-*
-# Except these file
-!.gitignore
-!test_get_crypto_data.py
-!__init__.py
-!eth_test_data.csv
+__pycache__
+test_ohlcv_sqlite.db

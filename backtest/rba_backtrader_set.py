@@ -41,6 +41,7 @@ class MaCrossStrategy(bt.Strategy):
         elif self.crossover < 0:
             self.close()
 
+
 class backtrader_set():
 
     def __init__(self, symbols, strategy, sizer, sizer_param, start_date_str, end_date_str, exchange=None, starting_cash=1000.0):
