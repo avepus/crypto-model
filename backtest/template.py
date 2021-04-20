@@ -5,6 +5,7 @@ import backtrader.feeds as btfeeds
 
 import pandas as pd
 import rba_tools.retriver.get_crypto_data as gcd
+import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
 
 class CashMarket(bt.analyzers.Analyzer):
     """
@@ -48,11 +49,12 @@ def runstrat(print_df=False, plot=True):
     cerebro = bt.Cerebro()
 
     # Add a strategy
-    cerebro.addstrategy(MaCrossStrategy)
+    #cerebro.addstrategy(MaCrossStrategy)
+    cerebro.addstrategy(rbsstrat.TestStrategy)
 
     # Get a pandas dataframe
     binance = gcd.getBinanceExchange()
-    dataframe = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/18', '12/31/19')
+    dataframe = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/18', '12/31/18')
 
     if print_df:
         print('--------------------------------------------------')
@@ -73,7 +75,8 @@ def runstrat(print_df=False, plot=True):
 
     # Plot the result
     if plot:
-        cerebro.plot(numfigs=2, style='bar')
+        myp = cerebro.plot(numfigs=1, style='bar')
+        print(myp)
 
 
 if __name__ == '__main__':
