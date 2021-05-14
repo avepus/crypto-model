@@ -18,15 +18,31 @@ class TrailingStopStrategy(bt.Strategy):
 
 class TestStrategy(bt.Strategy):
 
+    params = (
+        ('period', 5),
+        ('threshold',92.5),
+        )
+
     def __init__(self):
         ma = bt.ind.SMA(period = 10)
         self.maslope = rbsind.Slope(ma)
-        self.lowhigh = rbsind.LowHighRatio(self.data, period=7)
+        #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
+        #self.con_bars = rbsind.TrendInfo(self.data)
+        self.in_trend = rbsind.InTrend(self.data)
 
     def next(self):
+        #print("con_bars =",self.con_bars[0])
+        #print("consecutive_bars =",self.con_bars.consecutive_bars[0])
+        #print("trend_start =",self.con_bars.trend_start[0])
+        #print("trend_percentage =",self.con_bars.trend_percentage[0])
+        print("consec_bars =",self.in_trend.consec_bars[0])
+        print("trend_started_ago =",self.in_trend.trend_started_ago[0])
+        print("trend_high =",self.in_trend.trend_high[0])
+        print("trend_retrace =",self.in_trend.trend_retrace[0])
+        print("trend_open =",self.in_trend.trend_open[0])
         if len(self.maslope) < 2:
             return
-        if self.maslope[0] > 0 and self.maslope[-1] < 0:
-            self.buy()
-        elif self.maslope[0] < 0 and self.maslope[-1] > 0:
-            self.close()
+        #if self.lines.consecutive_bars[0] == -1 and self.lines.consecutive_bars[-1] > 6:
+        #    self.buy()
+        #elif self.lines.consecutive_bars[0] < -2:
+        #    self.close()

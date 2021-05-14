@@ -50,7 +50,7 @@ def runstrat(print_df=False, plot=True):
 
     # Add a strategy
     #cerebro.addstrategy(MaCrossStrategy)
-    cerebro.addstrategy(rbsstrat.TestStrategy)
+    cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
 
     # Get a pandas dataframe
     binance = gcd.getBinanceExchange()
