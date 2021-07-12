@@ -25,10 +25,13 @@ class TestStrategy(bt.Strategy):
 
     def __init__(self):
         ma = bt.ind.SMA(period = 10)
-        self.maslope = rbsind.Slope(ma)
+        #self.maslope = rbsind.Slope(ma)
         #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
         #self.con_bars = rbsind.TrendInfo(self.data)
         self.in_trend = rbsind.InTrend(self.data)
+        self.retrace_percent = rbsind.Retrace_Percent(self.data)
+        self.trend_high = rbsind.Trend_High(self.data)
+        self.trend_open = rbsind.Trend_Open(self.data)
 
     def next(self):
         #print("con_bars =",self.con_bars[0])
@@ -40,9 +43,10 @@ class TestStrategy(bt.Strategy):
         print("trend_high =",self.in_trend.trend_high[0])
         print("trend_retrace =",self.in_trend.trend_retrace[0])
         print("trend_open =",self.in_trend.trend_open[0])
-        if len(self.maslope) < 2:
-            return
+        print("date =",self.datetime.datetime())
+        #if len(self.maslope) < 2:
+        #    return
         #if self.lines.consecutive_bars[0] == -1 and self.lines.consecutive_bars[-1] > 6:
         #    self.buy()
         #elif self.lines.consecutive_bars[0] < -2:
-        #    self.close()
+        #    self.sell()

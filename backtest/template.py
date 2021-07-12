@@ -54,7 +54,7 @@ def runstrat(print_df=False, plot=True):
 
     # Get a pandas dataframe
     binance = gcd.getBinanceExchange()
-    dataframe = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/18', '12/31/18')
+    dataframe = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/19', '12/31/19')
 
     if print_df:
         print('--------------------------------------------------')
@@ -68,7 +68,7 @@ def runstrat(print_df=False, plot=True):
 
     cerebro.adddata(data)
 
-    cerebro.addanalyzer(CashMarket, _name='cash_market')
+    #cerebro.addanalyzer(CashMarket, _name='cash_market')
 
     # Run over everything
     strats = cerebro.run()

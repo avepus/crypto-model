@@ -66,7 +66,7 @@ class ConsecutiveBars(bt.Indicator):
         #this would be case when close = open
         self.lines.consecutive_bars[0] = self.lines.consecutive_bars[-1]
 
-class InTrend(bt.Indicator): #next step figure out why trend keeps stopping like it does in 2018
+class InTrend(bt.Indicator):
     """
     Build this with some combination of consecutive bars and if it retraces past a certain point the trend is done
     params:
@@ -81,10 +81,15 @@ class InTrend(bt.Indicator): #next step figure out why trend keeps stopping like
     trend_high - high of the trend
     """
 
-    params = (('minimum_bars',2),('maximum_bars',20),('minimum_move_percent',10),('trend_retrace_percent',90),)
+    params = (('minimum_bars',2),('maximum_bars',20),('minimum_move_percent',10),('trend_retrace_percent',85),)
 
     lines = ('consec_bars', 'trend_started_ago', 'trend_high', 'trend_retrace', 'trend_open')
 
+    plotlines = dict(consec_bars=dict(color="black"),
+                     trend_started_ago=dict(color="red", _method="scatter"),
+                     trend_high=dict(color="blue"),
+                     trend_retrace=dict(_plotskip=True),
+                     trend_open=dict(_plotskip=True))
     def __init__(self):
         self.lines.consec_bars = ConsecutiveBars(self.data)
 
@@ -95,7 +100,7 @@ class InTrend(bt.Indicator): #next step figure out why trend keeps stopping like
             #we just turned down, need to check if this is a new trend
             over_min_bars = self.lines.consec_bars[-1] > self.p.minimum_bars
 
-            high = self.data.high[-1]
+            high = max(self.data.high[-1],self.data.high[0])
             percent_to_high = (high - self.data.open[consecutive_bar_start]) / self.data.open[consecutive_bar_start] * 100
             over_min_percent = percent_to_high > self.p.minimum_move_percent
 
@@ -113,7 +118,7 @@ class InTrend(bt.Indicator): #next step figure out why trend keeps stopping like
         trend_start_bars_back = int(self.lines.trend_started_ago[-1]) - 1
 
         
-        trend_exceeds_max_bars = trend_start_bars_back > self.p.maximum_bars
+        trend_exceeds_max_bars = abs(trend_start_bars_back) > self.p.maximum_bars
         if trend_exceeds_max_bars:
             return
 
@@ -134,6 +139,33 @@ class InTrend(bt.Indicator): #next step figure out why trend keeps stopping like
         else:
             self.lines.trend_high[0] = self.data.high[0]
 
+class Retrace_Percent(bt.Indicator):
+    #Separated out from TrendInfo for graphing, likely not needed long-term
+    lines = ('trend_retrace',)
+
+    plotinfo = dict(plotyticks=[0, 100])
+    plotlines = dict(trend_retrace=dict(_plotskip=False, _method="scatter"))
+
+    def __init__(self):
+        self.lines.trend_retrace = InTrend(self.data).trend_retrace
+
+class Trend_High(bt.Indicator):
+    #Separated out from TrendInfo for graphing, likely not needed long-term
+    lines = ('trend_high',)
+    plotinfo = dict(subplot=False)
+    plotlines = dict(trend_high=dict(_plotskip=False, _method="scatter"))
+
+    def __init__(self):
+        self.lines.trend_high = InTrend(self.data).trend_high
+
+class Trend_Open(bt.Indicator):
+    #Separated out from TrendInfo for graphing, likely not needed long-term
+    lines = ('trend_open',)
+    plotinfo = dict(subplot=False)
+    plotlines = dict(trend_open=dict(_plotskip=False, _method="scatter", color="green"))
+
+    def __init__(self):
+        self.lines.trend_open = InTrend(self.data).trend_open
 
 class TrendInfo(bt.Indicator):
     """
