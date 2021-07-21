@@ -35,6 +35,9 @@ class MaCrossStrategy(bt.Strategy):
 
         self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
 
+
+
+
     def next(self):
         if not self.position:
             if self.crossover > 0:
@@ -43,7 +46,7 @@ class MaCrossStrategy(bt.Strategy):
             self.close()
 
 
-def runstrat(print_df=False, plot=True):
+def runstrat(print_df=False, plot=True): #Need stop loss, need to ensure proper behavior with sell target and with closing
 
     # Create a cerebro entity
     cerebro = bt.Cerebro()
