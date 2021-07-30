@@ -23,6 +23,7 @@ class TestStrategy(bt.Strategy):
         ('period', 5),
         ('threshold',92.5),
         ('debug',True),
+        ('max_drawdown_pct',10)
         )
 
     def __init__(self):
@@ -107,8 +108,13 @@ class TestStrategy(bt.Strategy):
         # Check if we are in the market
         if not self.position:
             if self.in_trend.trend_retrace[0] < 50:
-                self.buy()
-                self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
+                o1 = self.buy()
+                #self.log('o1=' + str(o1))
+                o2 = self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
+                #self.log('o2=' + str(o2))
+                stopLoss = self.data.close[0] * (1 - (self.p.max_drawdown_pct / 100))
+                o3 = self.sell(price=stopLoss,exectype=bt.Order.Stop, oco=o2)
+                #self.log('o3=' + str(o3))
         else:
             #if there is no trend then close
             if isnan(self.in_trend.trend_retrace[0]):

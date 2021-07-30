@@ -185,3 +185,22 @@ class TrendInfo(bt.Indicator):
             ago = int(-1 * self.lines.consecutive_bars[0])
             self.lines.trend_start[0] = self.data.open[ago]
             self.lines.trend_percentage[0] = self.data.close[0] / self.lines.trend_start[0] * 100
+
+class CashMarket(bt.analyzers.Analyzer):
+    """
+    Analyzer returning cash and market values for use in QuantStats
+    """
+
+    def start(self):
+        super(CashMarket, self).start()
+
+    def create_analysis(self):
+        self.rets = {}
+        self.vals = 0.0
+
+    def notify_cashvalue(self, cash, value):
+        self.vals = (cash, value)
+        self.rets[self.strategy.datetime.datetime()] = self.vals
+
+    def get_analysis(self):
+        return self.rets
