@@ -120,7 +120,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
         return_df = pd.DataFrame()
     connection = database.create_connection()
 
-    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str)
+    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str) #todo - checking that timeframe is retrieved
 
     from_date = parser.parse(from_date_str)
     end_date = parser.parse(end_date_str)
@@ -307,5 +307,5 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20')
+    df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20', timeframe='1h')
     print(df)
