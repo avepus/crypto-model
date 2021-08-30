@@ -93,8 +93,9 @@ class Testgcd(unittest.TestCase):
           eth_btc_saved_data = eth_btc_saved_data.append(append_df).sort_index()
           pd.testing.assert_frame_equal(eth_btc_data_from_exchange, eth_btc_saved_data)
 
-          #verify that we won't pull new data if the most recent data in our current data is less than two days old
-
+          #need timeframe based test cases 
+          #data is present but timeframe is not specific enough
+          #data is present and more specific data is available but not pulled when higher timeframe is requested
 
 if __name__ == "__main__":
     unittest.main()

@@ -14,12 +14,14 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import rba_tools.retriver.database as database
+from rba_tools.utils import convert_timeframe_to_ms
 import sqlite3
 
-timeframe_map_ms = { 
-        '1m': 60000,
-        '1h': 3600000,
-        '1d': 86400000
+timeframe_map_ms = {
+        'm': 60000,
+        'h': 3600000,
+        'd': 86400000,
+        'w': 86400000*7
     }
 
 def getBinanceExchange():
@@ -107,7 +109,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
         from_date_str (str) -- string representation of start date timeframe
         end_date_str (str) -- string representation of end date timeframe
         ret_as_list (bool) -- boolean indicating to return list of dfs or single df
-        timeFrame (str) -- timeframe to pull
+        timeFrame (str) -- timeframe to pull in string format like '3h'
         maxCalls (int) -- max number of data pulls for a given currency
                             intended for use as safety net to prevent too many calls
 
@@ -129,7 +131,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
     end_date_ms = convert_datetime_to_UTC_Ms(end_date)
 
     for symbol in symbol_list:
-        symbol_df = df.loc[df['Symbol'] == symbol]
+        symbol_df = df.loc[df['Symbol'] == symbol] #grab just this symbol data since they're all in one dataframe
         if symbol_df.empty and exchange is not None:
             symbol_df = retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms, timeframe, max_calls)
             if symbol_df.empty:
@@ -237,7 +239,7 @@ def retrieve_data_from_exchange(symbol, exchange, from_date_ms, end_date_ms=None
     return retdf.loc[from_date_ms:end_date_ms,:]
     
 
-def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=None):
+def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=None, timeframe=None):
     """Attempts to retrive data from saved database
     
     Parameters:
@@ -245,23 +247,30 @@ def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=Non
         connection (obj) -- connectiont to sql database
         from_date_str (str) -- string representation of start date timeframe
         end_date_str (str) -- string representation of end date timeframe
+        timeFrame (str) -- timeframe to pull in string format like '3h'
 
     Returns:
         DataFrame: retrived data in Pandas DataFrame with ms timestamp index
     """
-    symbol_condition = "Symbol in ('" + "','".join(symbol_list) + "')"
+    comma_symbols = "','".join(symbol_list)
+    symbol_condition = "Symbol in ('" + comma_symbols + "')"
     start_condition = ''
     end_condition = ''
+    timeframe_condition = ''
     if from_date_str:
         start_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(from_date_str))
         start_condition = f'and TIMESTAMP >= {start_date}'
     if end_date_str:
         end_date = convert_datetime_to_UTC_Ms(get_UTC_datetime(end_date_str))
         end_condition = f'and TIMESTAMP <= {end_date}'
+    if timeframe:
+        timeframe_ms = convert_timeframe_to_ms(timeframe)
+        timeframe_condition = f'and TIMESTAMP % {timeframe_ms} = 0'
     query = f"""SELECT * FROM OHLCV_DATA 
         WHERE {symbol_condition}
         {start_condition}
-        {end_condition}"""
+        {end_condition}
+        {timeframe_condition}"""
     try:
         df = pd.read_sql_query(query, connection)
     except Exception as e:
@@ -308,4 +317,11 @@ if __name__ == '__main__':
     exchange = getBinanceExchange()
     #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
     df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20', timeframe='1h')
+    #print(df)
+    first = get_DataFrame(['ETH/BTC'], exchange, '12/1/20', '12/3/20', timeframe='1h')
+    connection = database.create_connection()
+
+    df = get_saved_data(['ETH/BTC'], connection, '12/1/20', '12/3/20')
+    print(df)
+    connection.close()
     print(df)
