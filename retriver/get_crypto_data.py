@@ -187,12 +187,13 @@ def populate_is_final_column(df, from_date_ms, end_date_ms, timeframe):
         DataFrame: updated DataFrame (note the input DataFrame is modified)
     """
     #if our from date is less than one bar behind our earliest data then there is no previous data
-    if from_date_ms < (df.index.min() - timeframe_map_ms[timeframe]): 
+    timeframe_ms = convert_timeframe_to_ms(timeframe)
+    if from_date_ms < (df.index.min().item() - timeframe_ms): 
         df.at[df.index.min(),'Is_Final_Row'] = 1
-    two_days_ms = 2 * timeframe_map_ms[timeframe]
-    end_date_is_older_than_two_days = end_date_ms < (convert_datetime_to_UTC_Ms() - two_days_ms)
+    two_timeframes_ms = 2 * timeframe_ms
+    end_date_is_older_than_two_timeframes = end_date_ms < (convert_datetime_to_UTC_Ms() - two_timeframes_ms)
     #if our end date is greater than one bar past our latest data then this is no future data
-    if end_date_ms > (df.index.max() + timeframe_map_ms[timeframe]) and end_date_is_older_than_two_days:
+    if end_date_ms > (df.index.max() + timeframe_ms) and end_date_is_older_than_two_timeframes:
         df.at[df.index.max(),'Is_Final_Row'] = 1
     return df
     

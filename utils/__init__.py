@@ -1,3 +1,4 @@
+from re import split
 timeframe_map = { 'S' : 1 }
 timeframe_map['M'] = timeframe_map['S'] * 60
 timeframe_map['H'] = timeframe_map['M'] * 60
@@ -13,15 +14,11 @@ def convert_timeframe_to_sec(timeframe_string):
         The timeframe value in seconds
     """
     timeframe_string = timeframe_string.upper()
-    timeframe = None
-    factor = None
-    if timeframe_string[0].isnumeric(): #if first value is number, assume it is the factor and the next value is the timeframe
-        factor = timeframe_string[0]
-        timeframe = timeframe_string[1]
-    else: #if first value is not numeric, it is the timeframe
-        timeframe = timeframe_string[0]
-        if timeframe_string[1]:
-            factor = timeframe_string[1]
+    #set timeframe to the alpha character in the string
+    timeframe = ''.join(char for char in timeframe_string if not char.isdigit())
+    #set factor to the digits
+    digits = ''.join(char for char in timeframe_string if char.isdigit())
+    factor = int(digits) if digits else 1
     return timeframe_map[timeframe] * factor
 
 def convert_timeframe_to_ms(timeframe_string):

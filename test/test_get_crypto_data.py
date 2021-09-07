@@ -95,7 +95,20 @@ class Testgcd(unittest.TestCase):
 
           #need timeframe based test cases 
           #data is present but timeframe is not specific enough
+          data_from_get = gcd.get_DataFrame(['ETH/BTC'], binance, '12/1/20', '12/3/20', timeframe='4h')
+          expected_data = pd.read_csv(r'C:\Users\Avery\Documents\GitHub\rba_tools_project\rba_tools\test\ETH_BTC_4h_12-1-20_to_12-3-20.csv'
+                                      ,index_col = 'Timestamp'
+                                      ,parse_dates = True)
+          pd.testing.assert_frame_equal(data_from_get, expected_data)
+
           #data is present and more specific data is available but not pulled when higher timeframe is requested
+          data_from_get = gcd.get_DataFrame(['ETH/BTC'], binance, '12/1/20', '12/3/20', timeframe='1d')
+          expected_data = pd.read_csv(r'C:\Users\Avery\Documents\GitHub\rba_tools_project\rba_tools\test\daily_ETCBTC_12-1-20_to-12-3-20.csv'
+                                      ,index_col = 'Timestamp'
+                                      ,parse_dates = True)
+          pd.testing.assert_frame_equal(data_from_get, expected_data)
+
+          #corner case where we pull one day of data at a 4 hour timeframe but saved data only has the one data point
 
 if __name__ == "__main__":
     unittest.main()
