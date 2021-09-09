@@ -122,7 +122,7 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
         return_df = pd.DataFrame()
     connection = database.create_connection()
 
-    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str) #todo - checking that timeframe is retrieved
+    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str, timeframe=timeframe) #todo - checking that timeframe is retrieved
 
     from_date = parser.parse(from_date_str)
     end_date = parser.parse(end_date_str)
@@ -279,9 +279,29 @@ def get_saved_data(symbol_list, connection, from_date_str=None, end_date_str=Non
         print(e)
         return get_empty_ohlcv_df()
     df['Is_Final_Row'] = pd.to_numeric(df['Is_Final_Row'], errors='coerce')
-    return df.set_index('Timestamp')
+    df.set_index('Timestamp', inplace=True)
+    return trim_data_outside_timeframe(df, timeframe) 
 
+def trim_data_outside_timeframe(df, timeframe):
+    """Removes rows from dataframe that are not in the timeframe
+    
+    Parameters:
+        df (str/list) -- symbol(s) to get market data (e.g. "BCH/BTC")
+        timeframe (str) -- timeframe to pull in string format like '3h'
 
+    Returns:
+        DataFrame: with non-timeframe rows removed
+    """
+    timeframe_ms = convert_timeframe_to_ms(timeframe)
+    #get series of rows that are in the timeframe based on difference between rows
+    in_timeframe_bool_series = df.index.to_series().diff() == timeframe_ms
+    #the first row gets missed by the above line so this corrects that
+    try:
+        first_true = min(in_timeframe_bool_series.loc[in_timeframe_bool_series].index)
+    except ValueError:
+        return df
+    in_timeframe_bool_series[in_timeframe_bool_series.index < first_true] = True
+    return df.loc[in_timeframe_bool_series].copy()
 
 def set_data_timestamp_index(df, col='Timestamp', unit='ms'):
     """converts column with lable "Timestamp" of a DataFrame
@@ -317,12 +337,12 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
 if __name__ == '__main__':
     exchange = getBinanceExchange()
     #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20', timeframe='1h')
+    #df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20', timeframe='1h')
     #print(df)
-    first = get_DataFrame(['ETH/BTC'], exchange, '12/1/20', '12/3/20', timeframe='1h')
+    #first = get_DataFrame(['ETH/BTC'], exchange, '12/1/20', '12/3/20', timeframe='1h')
     connection = database.create_connection()
 
-    df = get_saved_data(['ETH/BTC'], connection, '12/1/20', '12/3/20')
+    df = get_saved_data(['ETH/BTC'], connection, '12/1/20', '12/5/20', timeframe='4h')
+
     print(df)
     connection.close()
-    print(df)
