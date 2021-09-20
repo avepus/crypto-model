@@ -106,6 +106,10 @@ class Testgcd(unittest.TestCase):
           expected_data = pd.read_csv(r'C:\Users\Avery\Documents\GitHub\rba_tools_project\rba_tools\test\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
                                       ,index_col = 'Timestamp'
                                       ,parse_dates = True)
+          print('data_from_get')
+          print(data_from_get)
+          print('expected_data')
+          print(expected_data)
           pd.testing.assert_frame_equal(data_from_get, expected_data)
 
           #testing pulling 1H and pulling up to saved data

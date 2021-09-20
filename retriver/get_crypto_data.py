@@ -296,10 +296,12 @@ def trim_data_outside_timeframe(df, timeframe):
     #get series of rows that are in the timeframe based on difference between rows
     in_timeframe_bool_series = df.index.to_series().diff() == timeframe_ms
     #the first row gets missed by the above line so this corrects that
+    if df.empty:
+        return df
     try:
         first_true = min(in_timeframe_bool_series.loc[in_timeframe_bool_series].index)
     except ValueError:
-        return df
+        return get_empty_ohlcv_df()
     in_timeframe_bool_series[in_timeframe_bool_series.index < first_true] = True
     return df.loc[in_timeframe_bool_series].copy()
 
