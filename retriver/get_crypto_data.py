@@ -39,6 +39,7 @@ def get_empty_ohlcv_df():
     return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
 
 class OHLCVDataRetriver(ABC):
+    "pulls OHLCV data for a specific symbol, timeframe, and date range"
 
     @abstractmethod
     def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime = None) -> Type[pd.DataFrame]:
@@ -63,9 +64,21 @@ class CCXTDataRetriver(OHLCVDataRetriver):
         """formats the data pulled from ccxt into the expected format"""
         header = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
         df = pd.DataFrame(data, columns=header).set_index('Timestamp')
+        df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
         df['Is_Final_Row'] = np.nan
         return df
+
+class SQLite3DatabaseRetriver(OHLCVDataRetriver):
+    """pulls data from an sqlite3 database"""
+    pass
+
+class OHLCVDataStoreer(ABC):
+    """saves OHLCV data"""
+
+    @abstractmethod
+    def save_ohlcv(self, OHLCVDatabase):
+        """saves OHLCV data"""
 
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
