@@ -11,7 +11,9 @@ database.database_file = db_file
 
 class Testgcd(unittest.TestCase):
 
-
+     def test_CCXTDataRetriver_Retriver(self):
+          pass
+          
 
      def test_get_DataFrame(self):
           #verifies that retriving the data from online source and from saved file yield the same dataframe

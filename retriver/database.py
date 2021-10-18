@@ -1,24 +1,25 @@
 import sqlite3
 from sqlite3 import Error
 from pathlib import Path
+#from abc import ABC, abstractmethod
 
-database_file = str(Path(__file__).parent) + '\\ohlcv_data\\ohlcv_sqlite.db'
 
-def create_connection():
-    """create a database connection to the SQLite database
 
-    Returns:
-        object: Connection object or None
-    """
-    connection = None
-    try:
-        connection = sqlite3.connect(database_file)
-    except Error as err:
-        print(err)
-        print(type(err))
-    return connection
+class OHLCVDatabase:
 
-def create_ohlcv_table(connection):
+    def __init__(self):
+        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\ohlcv_sqlite.db'
+        self.connection = None
+
+    def __enter__(self):
+        self.connection = sqlite3.connect(self.database_file)
+        return self.connection
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.connection: self.connection.close()
+
+
+def create_ohlcv_table():
     sql_create_ohlcv_table = """ CREATE TABLE IF NOT EXISTS OHLCV_DATA (
                                         Symbol string NOT NULL,
                                         Timestamp integer NOT NULL,
@@ -31,15 +32,16 @@ def create_ohlcv_table(connection):
                                         PRIMARY KEY (Symbol, Timestamp)
                                         CHECK(Is_Final_Row == 0 or Is_Final_Row == 1 or Is_Final_Row is NULL)
                                     ); """
-    try:
-        cursor = connection.cursor()
-        cursor.execute(sql_create_ohlcv_table)
-    except Error as err:
-        print(err)
+    with OHLCVDatabase() as connection:
+        try:
+            cursor = connection.cursor()
+            cursor.execute(sql_create_ohlcv_table)
+        except Error as err:
+            print(err)
 
 def insert_ohlcv_row(connection):
     sql = ''' INSERT INTO OHLCV_DATA
-              VALUES(:Symbol,:Timestamp,:Open,:High,:Low,:Close,:Volume,:Is_Final_Row)'''
+            VALUES(:Symbol,:Timestamp,:Open,:High,:Low,:Close,:Volume,:Is_Final_Row)'''
     value_map = {'Symbol' : 'BTC',
                 'Timestamp' : 124,
                 'Open' : 10.0,
@@ -59,11 +61,14 @@ def print_all_ohlcv_data(connection):
     print(cursor.fetchall())
 
 if __name__ == '__main__':
-    connection = create_connection()
-    if connection is not None:
+    with OHLCVDatabase() as connection:
+        print(connection)
+
+    print("success")
+    #if connection is not None:
         #create_ohlcv_table(connection)
-        insert_ohlcv_row(connection)
+    #    insert_ohlcv_row(connection)
         #print_all_ohlcv_data(connection)
-        connection.close()
-    else:
-        print("Error! Cannot create database connection.")
+    #    connection.close()
+    #else:
+    #    print("Error! Cannot create database connection.")

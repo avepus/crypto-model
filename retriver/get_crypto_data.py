@@ -6,7 +6,8 @@ Created on Sat Apr 25 22:09:42 2020
 @author: Avery
 
 """
-
+from abc import ABC, abstractmethod
+from typing import Type
 import ccxt
 import pandas as pd
 import numpy as np
@@ -37,10 +38,39 @@ def getBinanceExchange():
 def get_empty_ohlcv_df():
     return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
 
+class OHLCVDataRetriver(ABC):
+
+    @abstractmethod
+    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime = None) -> Type[pd.DataFrame]:
+        """obtains OHLCV data"""
+
+
+class CCXTDataRetriver(OHLCVDataRetriver):
+
+    def __init__(self, exchange: str):
+        exchange_class = getattr(ccxt, exchange)
+        self.exchange = exchange_class({
+                            'timeout': 30000,
+                            'enableRateLimit': True,
+                            })
+    
+    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+        from_date_ms = convert_datetime_to_UTC_Ms(from_date)
+        data = self.exchange.fetch_ohlcv(symbol, timeFrame, since=from_date_ms)
+        return self.format_ccxt_returned_data(data, symbol)
+
+    def format_ccxt_returned_data(self,data, symbol) -> Type[pd.DataFrame]:
+        """formats the data pulled from ccxt into the expected format"""
+        header = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
+        df = pd.DataFrame(data, columns=header).set_index('Timestamp')
+        df['Symbol'] = symbol
+        df['Is_Final_Row'] = np.nan
+        return df
+
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
-    Attempts to retrieve data from an exchange for a specified symbol
+    testAttempts to retrieve data from an exchange for a specified symbol
     
     Returns data retrieved from ccxt exchange in a pandas dataframe
     with Symbol and Is_Final_Row columns
@@ -120,9 +150,8 @@ def get_DataFrame(symbol_list, exchange=None, from_date_str='1/1/1970', end_date
         return_df = []
     else:
         return_df = pd.DataFrame()
-    connection = database.create_connection()
-
-    df = get_saved_data(symbol_list, connection, from_date_str, end_date_str, timeframe=timeframe) #todo - checking that timeframe is retrieved
+    with database.OHLCVDatabase() as connection:
+        df = get_saved_data(symbol_list, connection, from_date_str, end_date_str, timeframe=timeframe) 
 
     from_date = parser.parse(from_date_str)
     end_date = parser.parse(end_date_str)
