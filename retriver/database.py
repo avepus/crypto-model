@@ -1,14 +1,25 @@
+from abc import abstractmethod
 import sqlite3
 from sqlite3 import Error
 from pathlib import Path
-#from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 
+class OHLCVDatabase(ABC):
+    @abstractmethod
+    def __enter__(self):
+        """connects to database"""
+    
+    @abstractmethod
+    def __exit__(self):
+        """closes connection to database"""
 
+class SQLite3OHLCVDatabase(OHLCVDatabase):
 
-class OHLCVDatabase:
-
-    def __init__(self):
-        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\ohlcv_sqlite.db'
+    def __init__(self, test=False):
+        db_name = 'ohlcv_sqlite.db'
+        if test:
+            db_name = 'test_ohlcv_sqlite.db'
+        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
         self.connection = None
 
     def __enter__(self):
