@@ -1,8 +1,8 @@
 from re import split
-timeframe_map = { 'S' : 1 }
-timeframe_map['M'] = timeframe_map['S'] * 60
-timeframe_map['H'] = timeframe_map['M'] * 60
-timeframe_map['D'] = timeframe_map['H'] * 24
+timeframe_map = { 'S' : 1,
+                  'M' : 60,
+                  'H' : 60*60,
+                  'D' : 60*60*24 }
 
 def convert_timeframe_to_sec(timeframe_string):
     """Converts timeframe string to seconds
@@ -41,4 +41,4 @@ def convert_timeframe_to_ms(timeframe_string):
     
 
 if __name__ == "__main__":
-    print(convert_timeframe_to_sec('m') % timeframe_map['M'])
+    pass

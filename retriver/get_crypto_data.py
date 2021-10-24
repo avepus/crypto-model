@@ -15,7 +15,7 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import rba_tools.retriver.database as database
-from rba_tools.utils import convert_timeframe_to_ms
+from rba_tools.utils import convert_timeframe_to_ms,timeframe_name
 import sqlite3
 
 timeframe_map_ms = {
@@ -77,14 +77,17 @@ class OHLCVDataStoreer(ABC):
     """saves OHLCV data"""
 
     @abstractmethod
-    def save_ohlcv(self, OHLCVDatabase):
+    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str):
         """saves OHLCV data"""
     
 class PandasToSQLStoreer(OHLCVDataStoreer):
     """saves a pandas dataframe using to_sql method"""
 
-    def save_ohlcv(self, df: Type[pd.DataFrame]):
-        pass
+    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str):
+        """save pandas dataframe of OHLCV data using the to_sql function"""
+        table_name = timeframe_name(timeframe)
+        with OHLCVDatabase() as connection:
+            data.to_sql(table_name, connection, if_exists='append')
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
