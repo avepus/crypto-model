@@ -79,7 +79,12 @@ class OHLCVDataStoreer(ABC):
     @abstractmethod
     def save_ohlcv(self, OHLCVDatabase):
         """saves OHLCV data"""
+    
+class PandasToSQLStoreer(OHLCVDataStoreer):
+    """saves a pandas dataframe using to_sql method"""
 
+    def save_ohlcv(self, df: Type[pd.DataFrame]):
+        pass
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
