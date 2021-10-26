@@ -58,16 +58,30 @@ class CCXTDataRetriver(OHLCVDataRetriver):
     def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         from_date_ms = convert_datetime_to_UTC_Ms(from_date)
         data = self.exchange.fetch_ohlcv(symbol, timeFrame, since=from_date_ms)
-        return self.format_ccxt_returned_data(data, symbol)
+        return self.format_ccxt_returned_data(data, symbol, to_date)
 
-    def format_ccxt_returned_data(self,data, symbol) -> Type[pd.DataFrame]:
+    def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
         """formats the data pulled from ccxt into the expected format"""
         header = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
         df = pd.DataFrame(data, columns=header).set_index('Timestamp')
         df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
         df['Is_Final_Row'] = np.nan
-        return df
+        return df.loc[:to_date].copy()
+
+class CSVDataRetriver(OHLCVDataRetriver):
+
+    def __init__(self, file):
+        self.file = file
+        
+    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+        from_date_ms = convert_datetime_to_UTC_Ms(from_date)
+        data = pd.read_csv(self.file, index_col='Timestamp', parse_dates=True)
+        return data.loc[from_date:to_date].copy()
+
+    def format_csv_data(self, data, symbol: str, from_date: datetime, to_date: datetime):
+        df = data.loc[data['Symbol'] == symbol]
+        return df.loc[from_date:to_date].copy()
 
 class SQLite3DatabaseRetriver(OHLCVDataRetriver):
     """pulls data from an sqlite3 database"""

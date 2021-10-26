@@ -8,24 +8,62 @@ import rba_tools.retriver.get_crypto_data as gcd
 import rba_tools.retriver.database as database
 from pathlib import Path
 
-PERFORM_API_TESTS = False
+PERFORM_API_TESTS = True
+
+
 
 class Testgcd(unittest.TestCase):
 
+     def test_CSVDataRetriver(self):
+          csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
+          retriever = gcd.CSVDataRetriver(csv_file)
+          symbol = 'ETH/BTC'
+          timeframe = '1D'
+          from_date = datetime(2020, 12, 1)
+          to_date = datetime(2020, 12, 3)
+          result = retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          expected = pd.read_csv(csv_file, parse_dates=True, index_col='Timestamp')
+
+          pd.testing.assert_frame_equal(expected, result)
+     
      def test_CCXTDataRetriver_Retriver(self):
           if not PERFORM_API_TESTS:
                return
 
           symbol = 'ETH/BTC'
-          from_date = datetime(2020,1,1)
           timeframe = '1h'
+          from_date = datetime(2020, 12, 1)
+          to_date = datetime(2021, 12, 3)
           retriver = gcd.CCXTDataRetriver('binance')
-          result = retriver.fetch_ohlcv(symbol, timeframe, from_date, None)
+          result = retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
           file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
           expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
 
           pd.testing.assert_frame_equal(result, expected)
+
+     def test_Retreivers_Return_Equal(self):
+          if not PERFORM_API_TESTS:
+               return
+
+          csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
+          csv_retriever = gcd.CSVDataRetriver(csv_file)
+          symbol = 'ETH/BTC'
+          timeframe = '1d'
+          from_date = datetime(2020, 12, 1)
+          to_date = datetime(2020, 12, 3)
+          csv_result = csv_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          ccxt_retriver = gcd.CCXTDataRetriver('binance')
+          ccxt_result = ccxt_retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          pd.testing.assert_frame_equal(csv_result, ccxt_result)
+
+
+
+     def test_TestPandasToSQLStoreer(self):
+          pass
           
 
      # def test_get_DataFrame(self):

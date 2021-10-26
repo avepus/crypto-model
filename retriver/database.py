@@ -16,11 +16,13 @@ class OHLCVDatabase(ABC):
 class SQLite3OHLCVDatabase(OHLCVDatabase):
 
     def __init__(self, test=False):
-        db_name = 'ohlcv_sqlite.db'
         if test:
-            db_name = 'test_ohlcv_sqlite.db'
-        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
+            self.database_file = ':memory:'
+        else:
+            db_name = 'ohlcv_sqlite.db'
+            self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
         self.connection = None
+        
 
     def __enter__(self):
         self.connection = sqlite3.connect(self.database_file)
@@ -30,6 +32,7 @@ class SQLite3OHLCVDatabase(OHLCVDatabase):
         if self.connection: self.connection.close()
 
 
+#shouldn't need to create table since pandas.dataframe.to_sql creates it if it doesn't exist
 def create_ohlcv_table():
     sql_create_ohlcv_table = """ CREATE TABLE IF NOT EXISTS OHLCV_DATA (
                                         Symbol string NOT NULL,
