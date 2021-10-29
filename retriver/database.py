@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import Type
 import sqlite3
 from sqlite3 import Error
 from pathlib import Path
@@ -13,14 +14,17 @@ class OHLCVDatabase(ABC):
     def __exit__(self):
         """closes connection to database"""
 
+    @abstractmethod
+    def execute_query(self, query: str):
+        """executes an SQL query"""
+
 class SQLite3OHLCVDatabase(OHLCVDatabase):
 
     def __init__(self, test=False):
+        db_name = 'ohlcv_sqlite.db'
         if test:
-            self.database_file = ':memory:'
-        else:
-            db_name = 'ohlcv_sqlite.db'
-            self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
+            db_name = 'test_ohlcv_sqlite.db'
+        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
         self.connection = None
         
 
@@ -30,6 +34,17 @@ class SQLite3OHLCVDatabase(OHLCVDatabase):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.connection: self.connection.close()
+
+    def execute_query(self, query: str):
+        connection = sqlite3.connect(self.database_file)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query)
+            data = cursor.fetchall()
+        finally:
+            connection.close()
+        return data
+
 
 
 #shouldn't need to create table since pandas.dataframe.to_sql creates it if it doesn't exist

@@ -15,7 +15,7 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import rba_tools.retriver.database as database
-from rba_tools.utils import convert_timeframe_to_ms,timeframe_name
+from rba_tools.utils import convert_timeframe_to_ms,get_table_name
 import sqlite3
 
 timeframe_map_ms = {
@@ -42,9 +42,8 @@ class OHLCVDataRetriver(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
 
     @abstractmethod
-    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime = None) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime = None) -> Type[pd.DataFrame]:
         """obtains OHLCV data"""
-
 
 class CCXTDataRetriver(OHLCVDataRetriver):
 
@@ -55,9 +54,9 @@ class CCXTDataRetriver(OHLCVDataRetriver):
                             'enableRateLimit': True,
                             })
     
-    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         from_date_ms = convert_datetime_to_UTC_Ms(from_date)
-        data = self.exchange.fetch_ohlcv(symbol, timeFrame, since=from_date_ms)
+        data = self.exchange.fetch_ohlcv(symbol, timeframe, since=from_date_ms)
         return self.format_ccxt_returned_data(data, symbol, to_date)
 
     def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
@@ -74,7 +73,7 @@ class CSVDataRetriver(OHLCVDataRetriver):
     def __init__(self, file):
         self.file = file
         
-    def fetch_ohlcv(self, symbol: str, timeFrame: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         from_date_ms = convert_datetime_to_UTC_Ms(from_date)
         data = pd.read_csv(self.file, index_col='Timestamp', parse_dates=True)
         return data.loc[from_date:to_date].copy()
@@ -85,22 +84,48 @@ class CSVDataRetriver(OHLCVDataRetriver):
 
 class SQLite3DatabaseRetriver(OHLCVDataRetriver):
     """pulls data from an sqlite3 database"""
-    pass
+    
+    def __init__(self, database: Type[database.OHLCVDatabase]):
+        self.database = database
+
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+        query = self.get_query(symbol, timeframe, from_date, to_date)
+        return self.format_database_data(self.database.execute_query(query))
+
+    def format_database_data(self, data):
+        return data
+
+    def get_query(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime):
+        symbol_condition = "Symbol = '" + symbol + "'"
+        table_name = get_table_name(timeframe)
+        start_date = convert_datetime_to_UTC_Ms(from_date)
+        start_condition = f'and TIMESTAMP >= {start_date}'
+        end_date = convert_datetime_to_UTC_Ms(to_date)
+        end_condition = f'and TIMESTAMP <= {end_date}'
+        return f"""SELECT * FROM {table_name} 
+            WHERE {symbol_condition}
+            {start_condition}
+            {end_condition}"""
+
+    
 
 class OHLCVDataStoreer(ABC):
     """saves OHLCV data"""
 
     @abstractmethod
-    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str):
+    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str, test=False):
         """saves OHLCV data"""
     
 class PandasToSQLStoreer(OHLCVDataStoreer):
     """saves a pandas dataframe using to_sql method"""
 
-    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str):
+    def __init__(self):
+        pass
+
+    def save_ohlcv(self, OHLCVDatabase: database.OHLCVDatabase, data: Type[pd.DataFrame], timeframe: str, test=False):
         """save pandas dataframe of OHLCV data using the to_sql function"""
-        table_name = timeframe_name(timeframe)
-        with OHLCVDatabase() as connection:
+        table_name = get_table_name(timeframe)
+        with OHLCVDatabase(test) as connection:
             data.to_sql(table_name, connection, if_exists='append')
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):

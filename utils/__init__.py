@@ -21,13 +21,16 @@ def convert_timeframe_to_sec(timeframe_string):
     factor = int(digits) if digits else 1
     return timeframe_map[timeframe] * factor
 
-def timeframe_name(timeframe_string):
+def get_timeframe_name(timeframe_string):
     """Converts a timeframe string to a the highest time increment"""
     secs = convert_timeframe_to_sec(timeframe_string)
     increment_symbol = get_highest_time_increment(secs)
     increments = int(secs / timeframe_map[increment_symbol])
     return str(increments) + increment_symbol
     
+def get_table_name(timeframe_string):
+    return "TIMEFRAME_" + get_timeframe_name(timeframe_string)
+
 def get_highest_time_increment(seconds):
     if seconds % timeframe_map['D'] == 0: return 'D'
     if seconds % timeframe_map['H'] == 0: return 'H'
