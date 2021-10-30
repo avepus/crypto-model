@@ -90,7 +90,8 @@ class SQLite3DatabaseRetriver(OHLCVDataRetriver):
 
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         query = self.get_query(symbol, timeframe, from_date, to_date)
-        return self.format_database_data(self.database.execute_query(query))
+        data = self.database.execute_query(query)
+        return self.format_database_data(data)
 
     def format_database_data(self, data):
         return data
@@ -127,6 +128,10 @@ class PandasToSQLStoreer(OHLCVDataStoreer):
         table_name = get_table_name(timeframe)
         with OHLCVDatabase(test) as connection:
             data.to_sql(table_name, connection, if_exists='append')
+
+#old code below
+###########################################################
+
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
