@@ -15,7 +15,7 @@ from time import sleep
 from datetime import datetime, timedelta, timezone
 from dateutil import parser,tz
 import rba_tools.retriver.database as database
-from rba_tools.utils import convert_timeframe_to_ms,get_table_name
+from rba_tools.utils import convert_timeframe_to_ms,get_table_name_from_str,get_table_name_from_dataframe
 import sqlite3
 
 timeframe_map_ms = {
@@ -76,7 +76,7 @@ class CSVDataRetriver(OHLCVDataRetriver):
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         from_date_ms = convert_datetime_to_UTC_Ms(from_date)
         data = pd.read_csv(self.file, index_col='Timestamp', parse_dates=True)
-        return data.loc[from_date:to_date].copy()
+        return self.format_csv_data(data, symbol, from_date, to_date)
 
     def format_csv_data(self, data, symbol: str, from_date: datetime, to_date: datetime):
         df = data.loc[data['Symbol'] == symbol]
@@ -98,7 +98,7 @@ class SQLite3DatabaseRetriver(OHLCVDataRetriver):
 
     def get_query(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime):
         symbol_condition = "Symbol = '" + symbol + "'"
-        table_name = get_table_name(timeframe)
+        table_name = get_table_name_from_str(timeframe)
         start_date = convert_datetime_to_UTC_Ms(from_date)
         start_condition = f'and TIMESTAMP >= {start_date}'
         end_date = convert_datetime_to_UTC_Ms(to_date)
@@ -114,7 +114,7 @@ class OHLCVDataStoreer(ABC):
     """saves OHLCV data"""
 
     @abstractmethod
-    def save_ohlcv(self, OHLCVDatabase: Type[database.OHLCVDatabase], data: Type[pd.DataFrame], timeframe: str, test=False):
+    def save_ohlcv(self, data: Type[pd.DataFrame], OHLCVDatabase: Type[database.OHLCVDatabase], test = False):
         """saves OHLCV data"""
     
 class PandasToSQLStoreer(OHLCVDataStoreer):
@@ -123,9 +123,9 @@ class PandasToSQLStoreer(OHLCVDataStoreer):
     def __init__(self):
         pass
 
-    def save_ohlcv(self, OHLCVDatabase: database.OHLCVDatabase, data: Type[pd.DataFrame], timeframe: str, test=False):
+    def save_ohlcv(self, data: Type[pd.DataFrame], OHLCVDatabase: database.OHLCVDatabase, test=False):
         """save pandas dataframe of OHLCV data using the to_sql function"""
-        table_name = get_table_name(timeframe)
+        table_name = get_table_name_from_dataframe(data)
         with OHLCVDatabase(test) as connection:
             data.to_sql(table_name, connection, if_exists='append')
 

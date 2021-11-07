@@ -1,18 +1,16 @@
 from abc import abstractmethod
+from rba_tools.utils import get_table_name_from_dataframe
 from typing import Type
 import sqlite3
 from sqlite3 import Error
 from pathlib import Path
 from abc import ABC, abstractmethod
+from pandas import DataFrame
 
 class OHLCVDatabase(ABC):
     @abstractmethod
-    def __enter__(self):
-        """connects to database"""
-    
-    @abstractmethod
-    def __exit__(self):
-        """closes connection to database"""
+    def store_dataframe(self, df: Type[DataFrame]):
+        """stores pandas dataframe data into database"""
 
     @abstractmethod
     def execute_query(self, query: str):
@@ -21,19 +19,20 @@ class OHLCVDatabase(ABC):
 class SQLite3OHLCVDatabase(OHLCVDatabase):
 
     def __init__(self, test=False):
-        db_name = 'ohlcv_sqlite.db'
+        db_name = 'ohlcv_sqlite.'
         if test:
             db_name = 'test_ohlcv_sqlite.db'
         self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_name
         self.connection = None
         
 
-    def __enter__(self):
-        self.connection = sqlite3.connect(self.database_file)
-        return self.connection
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.connection: self.connection.close()
+    def store_dataframe(self, df: Type[DataFrame]):
+        connection = sqlite3.connect(self.database_file)
+        table_name = get_table_name_from_dataframe(df)
+        try:
+            df.to_sql(table_name, connection)
+        finally:
+            connection.close()
 
     def execute_query(self, query: str):
         connection = sqlite3.connect(self.database_file)

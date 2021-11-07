@@ -14,6 +14,13 @@ PERFORM_API_TESTS = True
 
 class Testgcd(unittest.TestCase):
 
+     @classmethod
+     def setUpClass(cls):
+          """clear out test data if it exists"""
+          db = database.SQLite3OHLCVDatabase(test=True)
+          if os.path.exists(db.db_file):
+               os.remove(db.db_file)
+
      def test_CSVDataRetriver(self):
           csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
           retriever = gcd.CSVDataRetriver(csv_file)
@@ -63,7 +70,17 @@ class Testgcd(unittest.TestCase):
 
 
      def test_TestPandasToSQLStoreer(self):
-          pass
+          csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
+          retriever = gcd.CSVDataRetriver(csv_file)
+          symbol = 'ETH/BTC'
+          timeframe = '1D'
+          from_date = datetime(2020, 12, 1)
+          to_date = datetime(2020, 12, 3)
+          data = retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          storer = gcd.PandasToSQLStoreer()
+
+          storer.save_ohlcv(data, database.SQLite3OHLCVDatabase, test=True)
           
 
      # def test_get_DataFrame(self):

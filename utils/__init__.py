@@ -1,4 +1,6 @@
 from re import split
+from pandas import DataFrame
+from typing import Type
 timeframe_map = { 'S' : 1,
                   'M' : 60,
                   'H' : 60*60,
@@ -21,17 +23,30 @@ def convert_timeframe_to_sec(timeframe_string):
     factor = int(digits) if digits else 1
     return timeframe_map[timeframe] * factor
 
-def get_timeframe_name(timeframe_string):
+def get_timeframe_name_from_str(timeframe_string: str) -> str:
     """Converts a timeframe string to a the highest time increment"""
     secs = convert_timeframe_to_sec(timeframe_string)
-    increment_symbol = get_highest_time_increment(secs)
-    increments = int(secs / timeframe_map[increment_symbol])
-    return str(increments) + increment_symbol
-    
-def get_table_name(timeframe_string):
-    return "TIMEFRAME_" + get_timeframe_name(timeframe_string)
+    return get_timeframe_name_from_seconds(secs)
 
-def get_highest_time_increment(seconds):
+def get_timeframe_name_from_seconds(seconds: int) -> str:
+    """Converts a timeframe string to a the highest time increment"""
+    increment_symbol = get_highest_time_increment_symbol(seconds)
+    increments = int(seconds / timeframe_map[increment_symbol])
+    return str(increments) + increment_symbol
+
+def get_table_name_from_str(timeframe_string: str) -> str:
+    return "TIMEFRAME_" + get_timeframe_name_from_str(timeframe_string)
+
+def get_table_name_from_dataframe(df: type[DataFrame]) -> str:
+    secs = get_timeframe_in_seconds_from_df(df)
+    return "TIMEFRAME_" + get_timeframe_name_from_seconds(secs)
+
+def get_timeframe_in_seconds_from_df(df: type[DataFrame]) -> int:
+    """given a DataFrame, returns the minimum number of seconds between the indicies"""
+    minimum_timedelta = min(df.index.to_series().diff().dropna())
+    return int(minimum_timedelta.total_seconds())
+
+def get_highest_time_increment_symbol(seconds) -> str:
     if seconds % timeframe_map['D'] == 0: return 'D'
     if seconds % timeframe_map['H'] == 0: return 'H'
     if seconds % timeframe_map['M'] == 0: return 'M'
@@ -41,7 +56,6 @@ def get_highest_time_increment(seconds):
 def convert_timeframe_to_ms(timeframe_string):
     """Converts timeframe string to milliseconds"""
     return convert_timeframe_to_sec(timeframe_string) * 1000
-    
 
 if __name__ == "__main__":
     pass
