@@ -5,7 +5,6 @@ import numpy as np
 from datetime import datetime
 import os
 import rba_tools.retriver.get_crypto_data as gcd
-import rba_tools.retriver.database as database
 from pathlib import Path
 
 PERFORM_API_TESTS = True
@@ -17,9 +16,9 @@ class Testgcd(unittest.TestCase):
      @classmethod
      def setUpClass(cls):
           """clear out test data if it exists"""
-          db = database.SQLite3OHLCVDatabase(test=True)
-          if os.path.exists(db.db_file):
-               os.remove(db.db_file)
+          db = gcd.SQLite3OHLCVDatabase(test=True)
+          if os.path.exists(db.get_database_file()):
+               os.remove(db.get_database_file())
 
      def test_CSVDataRetriver(self):
           csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
@@ -69,18 +68,24 @@ class Testgcd(unittest.TestCase):
 
 
 
-     def test_TestPandasToSQLStoreer(self):
+     def test_sqlite3_store_and_retrieve(self):
           csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
           retriever = gcd.CSVDataRetriver(csv_file)
           symbol = 'ETH/BTC'
           timeframe = '1D'
           from_date = datetime(2020, 12, 1)
           to_date = datetime(2020, 12, 3)
-          data = retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+          csv_result = retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-          storer = gcd.PandasToSQLStoreer()
+          sqlite3_db = gcd.SQLite3OHLCVDatabase(True)
 
-          storer.save_ohlcv(data, database.SQLite3OHLCVDatabase, test=True)
+          sqlite3_db.store_dataframe(csv_result)
+
+          db_retriever = gcd.DatabaseRetriver(sqlite3_db)
+
+          db_retriever_result = db_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          pd.testing.assert_frame_equal(csv_result, db_retriever_result)
           
 
      # def test_get_DataFrame(self):

@@ -17,6 +17,9 @@ from dateutil import parser,tz
 import rba_tools.retriver.database as database
 from rba_tools.utils import convert_timeframe_to_ms,get_table_name_from_str,get_table_name_from_dataframe
 import sqlite3
+from pathlib import Path
+
+DATAFRAME_HEADERS = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
 
 timeframe_map_ms = {
         'm': 60000,
@@ -36,7 +39,45 @@ def getBinanceExchange():
 
 
 def get_empty_ohlcv_df():
-    return pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume','Symbol','Is_Final_Row']).set_index('Timestamp')
+    return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index('Timestamp')
+
+
+class OHLCVDatabase(ABC):
+    @abstractmethod
+    def store_dataframe(self, df: Type[pd.DataFrame], test=False):
+        """stores pandas dataframe data into database"""
+
+    @abstractmethod
+    def execute_query(self, query: str):
+        """executes an SQL query"""
+
+class SQLite3OHLCVDatabase(OHLCVDatabase):
+
+    def __init__(self, test=False):
+        db_file = 'ohlcv_sqlite_test.db' if test else 'ohlcv_sqlite.db'
+        self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_file
+        self.connection = None
+        
+    def store_dataframe(self, df: Type[pd.DataFrame]):
+        connection = sqlite3.connect(self.get_database_file())
+        table_name = get_table_name_from_dataframe(df)
+        try:
+            df.to_sql(table_name, connection)
+        finally:
+            connection.close()
+
+    def execute_query(self, query: str):
+        connection = sqlite3.connect(self.database_file)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query)
+            data = cursor.fetchall()
+        finally:
+            connection.close()
+        return data
+
+    def get_database_file(self):
+        return self.database_file
 
 class OHLCVDataRetriver(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
@@ -82,10 +123,10 @@ class CSVDataRetriver(OHLCVDataRetriver):
         df = data.loc[data['Symbol'] == symbol]
         return df.loc[from_date:to_date].copy()
 
-class SQLite3DatabaseRetriver(OHLCVDataRetriver):
-    """pulls data from an sqlite3 database"""
+class DatabaseRetriver(OHLCVDataRetriver):
+    """pulls data from a OHLCVDatabase database"""
     
-    def __init__(self, database: Type[database.OHLCVDatabase]):
+    def __init__(self, database: Type[OHLCVDatabase]):
         self.database = database
 
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
@@ -94,40 +135,20 @@ class SQLite3DatabaseRetriver(OHLCVDataRetriver):
         return self.format_database_data(data)
 
     def format_database_data(self, data):
-        return data
+        df = pd.DataFrame(data=data, columns=DATAFRAME_HEADERS)
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+        return df.set_index('Timestamp')
 
     def get_query(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime):
         symbol_condition = "Symbol = '" + symbol + "'"
         table_name = get_table_name_from_str(timeframe)
-        start_date = convert_datetime_to_UTC_Ms(from_date)
-        start_condition = f'and TIMESTAMP >= {start_date}'
-        end_date = convert_datetime_to_UTC_Ms(to_date)
-        end_condition = f'and TIMESTAMP <= {end_date}'
+        start_condition = f'and TIMESTAMP >= "{from_date}"'
+        end_condition = f'and TIMESTAMP <= "{to_date}"'
         return f"""SELECT * FROM {table_name} 
             WHERE {symbol_condition}
             {start_condition}
             {end_condition}"""
 
-    
-
-class OHLCVDataStoreer(ABC):
-    """saves OHLCV data"""
-
-    @abstractmethod
-    def save_ohlcv(self, data: Type[pd.DataFrame], OHLCVDatabase: Type[database.OHLCVDatabase], test = False):
-        """saves OHLCV data"""
-    
-class PandasToSQLStoreer(OHLCVDataStoreer):
-    """saves a pandas dataframe using to_sql method"""
-
-    def __init__(self):
-        pass
-
-    def save_ohlcv(self, data: Type[pd.DataFrame], OHLCVDatabase: database.OHLCVDatabase, test=False):
-        """save pandas dataframe of OHLCV data using the to_sql function"""
-        table_name = get_table_name_from_dataframe(data)
-        with OHLCVDatabase(test) as connection:
-            data.to_sql(table_name, connection, if_exists='append')
 
 #old code below
 ###########################################################
