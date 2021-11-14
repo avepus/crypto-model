@@ -44,12 +44,12 @@ def get_empty_ohlcv_df():
 
 class OHLCVDatabase(ABC):
     @abstractmethod
-    def store_dataframe(self, df: Type[pd.DataFrame], test=False):
+    def store_dataframe(self, df: Type[pd.DataFrame], test=False) -> None:
         """stores pandas dataframe data into database"""
 
     @abstractmethod
-    def execute_query(self, query: str):
-        """executes an SQL query"""
+    def get_query_result_as_dataframe(self, query: str) -> type[pd.DataFrame]:
+        """executes an SQL query and returns results in dataframe"""
 
 class SQLite3OHLCVDatabase(OHLCVDatabase):
 
@@ -66,7 +66,17 @@ class SQLite3OHLCVDatabase(OHLCVDatabase):
         finally:
             connection.close()
 
-    def execute_query(self, query: str):
+    def get_query_result_as_dataframe(self, query: str):
+        connection = sqlite3.connect(self.get_database_file())
+        result = get_empty_ohlcv_df()
+        try:
+            result = pd.read_sql_query(query, connection)
+        finally:
+            connection.close()
+        return result
+
+    def _execute_query(self, query: str):
+        """execute and return data from a query. Meant only for troubleshooting"""
         connection = sqlite3.connect(self.database_file)
         cursor = connection.cursor()
         try:
@@ -131,15 +141,16 @@ class DatabaseRetriver(OHLCVDataRetriver):
 
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         query = self.get_query(symbol, timeframe, from_date, to_date)
-        data = self.database.execute_query(query)
-        return self.format_database_data(data)
+        query_result = self.database.get_query_result_as_dataframe(query)
+        return self.format_database_data(query_result)
 
     def format_database_data(self, data):
-        df = pd.DataFrame(data=data, columns=DATAFRAME_HEADERS)
-        df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-        return df.set_index('Timestamp')
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'])
+        data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
+        return data.set_index('Timestamp')
 
     def get_query(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime):
+        """Generate query based on fetch_ohlcv parameters"""
         symbol_condition = "Symbol = '" + symbol + "'"
         table_name = get_table_name_from_str(timeframe)
         start_condition = f'and TIMESTAMP >= "{from_date}"'
