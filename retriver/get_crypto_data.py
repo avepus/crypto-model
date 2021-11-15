@@ -20,6 +20,7 @@ import sqlite3
 from pathlib import Path
 
 DATAFRAME_HEADERS = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
+INDEX_HEADER = 'Timestamp'
 
 timeframe_map_ms = {
         'm': 60000,
@@ -39,7 +40,7 @@ def getBinanceExchange():
 
 
 def get_empty_ohlcv_df():
-    return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index('Timestamp')
+    return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index(INDEX_HEADER)
 
 
 class OHLCVDatabase(ABC):
@@ -112,8 +113,8 @@ class CCXTDataRetriver(OHLCVDataRetriver):
 
     def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
         """formats the data pulled from ccxt into the expected format"""
-        header = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
-        df = pd.DataFrame(data, columns=header).set_index('Timestamp')
+        header = [INDEX_HEADER, 'Open', 'High', 'Low', 'Close', 'Volume']
+        df = pd.DataFrame(data, columns=header).set_index(INDEX_HEADER)
         df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
         df['Is_Final_Row'] = np.nan
@@ -126,7 +127,7 @@ class CSVDataRetriver(OHLCVDataRetriver):
         
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
         from_date_ms = convert_datetime_to_UTC_Ms(from_date)
-        data = pd.read_csv(self.file, index_col='Timestamp', parse_dates=True)
+        data = pd.read_csv(self.file, index_col=INDEX_HEADER, parse_dates=True)
         return self.format_csv_data(data, symbol, from_date, to_date)
 
     def format_csv_data(self, data, symbol: str, from_date: datetime, to_date: datetime):
@@ -145,21 +146,29 @@ class DatabaseRetriver(OHLCVDataRetriver):
         return self.format_database_data(query_result)
 
     def format_database_data(self, data):
-        data['Timestamp'] = pd.to_datetime(data['Timestamp'])
+        data[INDEX_HEADER] = pd.to_datetime(data[INDEX_HEADER])
         data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
-        return data.set_index('Timestamp')
+        return data.set_index(INDEX_HEADER)
 
     def get_query(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime):
         """Generate query based on fetch_ohlcv parameters"""
         symbol_condition = "Symbol = '" + symbol + "'"
         table_name = get_table_name_from_str(timeframe)
-        start_condition = f'and TIMESTAMP >= "{from_date}"'
-        end_condition = f'and TIMESTAMP <= "{to_date}"'
+        start_condition = f'and {INDEX_HEADER} >= "{from_date}"'
+        end_condition = f'and {INDEX_HEADER} <= "{to_date}"'
         return f"""SELECT * FROM {table_name} 
             WHERE {symbol_condition}
             {start_condition}
             {end_condition}"""
 
+def main(symbol: str, from_date: str, to_date=None, exchange=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retiever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
+    """retrieves a dataframe with the default settings"""
+    #retrieve data from stored database if we have one. Use default if None
+
+    #retrieve data from online if we have a retriver. Use default if None
+
+    #save data if we have a database
+    pass
 
 #old code below
 ###########################################################
@@ -185,7 +194,7 @@ def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d',
         start_time_ms = convert_datetime_to_UTC_Ms(get_UTC_datetime(start_time_ms))
     if exchange is None:
         exchange = getBinanceExchange()
-    header = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume']
+    header = [INDEX_HEADER, 'Open', 'High', 'Low', 'Close', 'Volume']
     if not exchange.has['fetchOHLCV']:
         print(exchange, "doesn't support fetchOHLCV")
         return pd.DataFrame([], columns=header) #empty dataframe
