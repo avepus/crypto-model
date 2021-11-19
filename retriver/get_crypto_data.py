@@ -107,8 +107,9 @@ class CCXTDataRetriver(OHLCVDataRetriver):
                             })
     
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
-        from_date_ms = convert_datetime_to_UTC_Ms(from_date)
-        data = self.exchange.fetch_ohlcv(symbol, timeframe, since=from_date_ms)
+        from_date_ms = int(from_date.timestamp() * 1000)
+        to_date_ms = int(to_date.timestamp() * 1000)
+        data = self.get_all_ccxt_data(symbol, timeframe, from_date_ms, to_date_ms)
         return self.format_ccxt_returned_data(data, symbol, to_date)
 
     def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
@@ -120,13 +121,31 @@ class CCXTDataRetriver(OHLCVDataRetriver):
         df['Is_Final_Row'] = np.nan
         return df.loc[:to_date].copy()
 
+    def get_all_ccxt_data(self, symbol, timeframe, from_date_ms, to_date_ms):
+        """pull ccxt data repeatedly until we have all data"""
+        call_count = 1
+        return_data = None
+        to_date_is_found_or_passed = False
+        while not to_date_is_found_or_passed:
+            print(f'Fetching {symbol} market data from {self.exchange}. call #{call_count}')
+            data = self.exchange.fetch_ohlcv(symbol, timeframe, since=from_date_ms)
+            sleep(self.exchange.rateLimit / 1000)
+            call_count += 1
+            if return_data:
+                return_data.append(data)
+            else:
+                return_data = data
+            to_date_is_found_or_passed = any(to_date_ms == row[0] or to_date_ms < row[0] for row in data)
+            last_end_timestamp_ms = data[len(data) - 1][0]
+            from_date_ms = last_end_timestamp_ms + 1 #add one to not grab same time twice
+        return return_data
+
 class CSVDataRetriver(OHLCVDataRetriver):
 
     def __init__(self, file):
         self.file = file
         
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
-        from_date_ms = convert_datetime_to_UTC_Ms(from_date)
         data = pd.read_csv(self.file, index_col=INDEX_HEADER, parse_dates=True)
         return self.format_csv_data(data, symbol, from_date, to_date)
 
@@ -161,14 +180,41 @@ class DatabaseRetriver(OHLCVDataRetriver):
             {start_condition}
             {end_condition}"""
 
-def main(symbol: str, from_date: str, to_date=None, exchange=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retiever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
-    """retrieves a dataframe with the default settings"""
+def checked_retrieved_data(data: Type[pd.DataFrame], symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None):
+    """checks if the data retrieved has all the data"""
+
+
+def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retiever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
+    """retrieves a dataframe from saved database if possible otherwise from online"""
+    from_date = parser.parse(from_date_str)
+    to_date = parser.parse(to_date_str)
+
+    stored_data = None
+
     #retrieve data from stored database if we have one. Use default if None
+    if stored_retriever:
+        stored_data = stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
     #retrieve data from online if we have a retriver. Use default if None
+    if not online_retiever:
+        online_retiever = get_default_online_retriever()
 
     #save data if we have a database
-    pass
+    if not database:
+        database = get_default_database()
+
+    
+    
+def main_def(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None):
+    database = SQLite3OHLCVDatabase()
+    stored_retriver = DatabaseRetriver(database)
+    online_retriver = CCXTDataRetriver('binance')
+
+    return main(symbol, timeframe, from_date_str, to_date_str, stored_retriver, online_retriver, database)
+
+
+
+    
 
 #old code below
 ###########################################################
@@ -472,14 +518,9 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
    
 
 if __name__ == '__main__':
-    exchange = getBinanceExchange()
-    #symbols = getAllSymbolsForQuoteCurrency("BTC", exchange)
-    #df = get_DataFrame(['ETH/BTC'], exchange, '7/27/18', '7/29/20', timeframe='1h')
-    #print(df)
-    #first = get_DataFrame(['ETH/BTC'], exchange, '12/1/20', '12/3/20', timeframe='1h')
-    connection = database.create_connection()
-
-    df = get_saved_data(['ETH/BTC'], connection, '12/1/20', '12/5/20', timeframe='4h')
-
-    print(df)
-    connection.close()
+    symbol = 'ETH/BTC'
+    timeframe = '1d'
+    from_date = datetime(2019, 12, 1)
+    to_date = datetime(2021, 12, 3)
+    retriver = CCXTDataRetriver('binance')
+    result = retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
