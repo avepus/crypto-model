@@ -40,7 +40,7 @@ class Testgcd(unittest.TestCase):
           symbol = 'ETH/BTC'
           timeframe = '1h'
           from_date = datetime(2020, 12, 1)
-          to_date = datetime(2021, 12, 3)
+          to_date = datetime(2020, 12, 20)
           retriver = gcd.CCXTDataRetriver('binance')
           result = retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 

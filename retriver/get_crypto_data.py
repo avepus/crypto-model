@@ -12,7 +12,7 @@ import ccxt
 import pandas as pd
 import numpy as np
 from time import sleep
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, date, timedelta
 from dateutil import parser,tz
 import rba_tools.retriver.database as database
 from rba_tools.utils import convert_timeframe_to_ms,get_table_name_from_str,get_table_name_from_dataframe
@@ -94,8 +94,14 @@ class OHLCVDataRetriver(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
 
     @abstractmethod
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime = None) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> Type[pd.DataFrame]:
         """obtains OHLCV data"""
+
+    def get_from_and_to_datetimes(self, from_date: date, to_date: date):
+        from_datetime = datetime.combine(from_date, datetime.min.time())
+        #add one day minus 1 second to get all the data from the end_date. Need for timeframes < 1 day
+        to_datetime = datetime.combine(to_date, datetime.min.time()) + timedelta(seconds = -1, days=1)
+        return (from_datetime, to_datetime)
 
 class CCXTDataRetriver(OHLCVDataRetriver):
 
@@ -106,11 +112,12 @@ class CCXTDataRetriver(OHLCVDataRetriver):
                             'enableRateLimit': True,
                             })
     
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
-        from_date_ms = int(from_date.timestamp() * 1000)
-        to_date_ms = int(to_date.timestamp() * 1000)
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> Type[pd.DataFrame]:
+        from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
+        from_date_ms = int(from_datetime.timestamp() * 1000)
+        to_date_ms = int(to_datetime.timestamp() * 1000)
         data = self.get_all_ccxt_data(symbol, timeframe, from_date_ms, to_date_ms)
-        return self.format_ccxt_returned_data(data, symbol, to_date)
+        return self.format_ccxt_returned_data(data, symbol, to_datetime)
 
     def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
         """formats the data pulled from ccxt into the expected format"""
@@ -130,9 +137,11 @@ class CCXTDataRetriver(OHLCVDataRetriver):
             print(f'Fetching {symbol} market data from {self.exchange}. call #{call_count}')
             data = self.exchange.fetch_ohlcv(symbol, timeframe, since=from_date_ms)
             sleep(self.exchange.rateLimit / 1000)
+            if not data: #handle when we don't get any data by returning what we have so far
+                return return_data
             call_count += 1
             if return_data:
-                return_data.append(data)
+                return_data.extend(data)
             else:
                 return_data = data
             to_date_is_found_or_passed = any(to_date_ms == row[0] or to_date_ms < row[0] for row in data)
@@ -146,8 +155,9 @@ class CSVDataRetriver(OHLCVDataRetriver):
         self.file = file
         
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+        from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
         data = pd.read_csv(self.file, index_col=INDEX_HEADER, parse_dates=True)
-        return self.format_csv_data(data, symbol, from_date, to_date)
+        return self.format_csv_data(data, symbol, from_datetime, to_datetime)
 
     def format_csv_data(self, data, symbol: str, from_date: datetime, to_date: datetime):
         df = data.loc[data['Symbol'] == symbol]
@@ -191,17 +201,16 @@ def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None,
 
     stored_data = None
 
-    #retrieve data from stored database if we have one. Use default if None
+    #retrieve data from stored database if we have one
     if stored_retriever:
         stored_data = stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-    #retrieve data from online if we have a retriver. Use default if None
-    if not online_retiever:
-        online_retiever = get_default_online_retriever()
-
-    #save data if we have a database
-    if not database:
-        database = get_default_database()
+    if online_retiever:
+        pass
+        #pull data from it if necessary
+        if database:
+            pass
+            #store pulled data
 
     
     
