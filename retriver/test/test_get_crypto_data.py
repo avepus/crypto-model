@@ -33,7 +33,8 @@ class Testgcd(unittest.TestCase):
 
           pd.testing.assert_frame_equal(expected, result)
      
-     def test_CCXTDataRetriver_Retriver(self):
+     def test_CCXTDataRetriver_Retriver_Basic(self):
+          """test a simple CCXT single data pull"""
           if not PERFORM_API_TESTS:
                return
 
@@ -45,6 +46,23 @@ class Testgcd(unittest.TestCase):
           result = retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
           file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
+          expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
+
+          pd.testing.assert_frame_equal(result, expected)
+
+     def test_CCXTDataRetriver_Retriver_Multicall(self):
+          """test a CCXT request that requres multiple API calls"""
+          if not PERFORM_API_TESTS:
+               return
+
+          symbol = 'ETH/BTC'
+          timeframe = '1h'
+          from_date = datetime(2021, 1, 1)
+          to_date = datetime(2021, 1, 31)
+          retriver = gcd.CCXTDataRetriver('binance')
+          result = retriver.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+          file = str(Path(__file__).parent) + '\ETH_BTC_1H_2021-1-1.csv'
           expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
 
           pd.testing.assert_frame_equal(result, expected)

@@ -76,6 +76,13 @@ class SQLite3OHLCVDatabase(OHLCVDatabase):
             connection.close()
         return result
 
+    def table_exists(self, table_name: str):
+        query = f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
+        if self._execute_query(query):
+            return True
+        else:
+            return False
+
     def _execute_query(self, query: str):
         """execute and return data from a query. Meant only for troubleshooting"""
         connection = sqlite3.connect(self.database_file)
@@ -114,13 +121,15 @@ class CCXTDataRetriver(OHLCVDataRetriver):
     
     def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> Type[pd.DataFrame]:
         from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
-        from_date_ms = int(from_datetime.timestamp() * 1000)
-        to_date_ms = int(to_datetime.timestamp() * 1000)
+        from_date_ms = convert_datetime_to_UTC_Ms(from_datetime)
+        to_date_ms = convert_datetime_to_UTC_Ms(to_datetime)
         data = self.get_all_ccxt_data(symbol, timeframe, from_date_ms, to_date_ms)
         return self.format_ccxt_returned_data(data, symbol, to_datetime)
 
     def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
         """formats the data pulled from ccxt into the expected format"""
+        if not data:
+            return get_empty_ohlcv_df()
         header = [INDEX_HEADER, 'Open', 'High', 'Low', 'Close', 'Volume']
         df = pd.DataFrame(data, columns=header).set_index(INDEX_HEADER)
         df.index = pd.to_datetime(df.index, unit='ms')
@@ -175,6 +184,8 @@ class DatabaseRetriver(OHLCVDataRetriver):
         return self.format_database_data(query_result)
 
     def format_database_data(self, data):
+        if not data:
+            return get_empty_ohlcv_df()
         data[INDEX_HEADER] = pd.to_datetime(data[INDEX_HEADER])
         data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
         return data.set_index(INDEX_HEADER)
@@ -194,25 +205,52 @@ def checked_retrieved_data(data: Type[pd.DataFrame], symbol: str, timeframe: str
     """checks if the data retrieved has all the data"""
 
 
-def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retiever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
+def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retriever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
     """retrieves a dataframe from saved database if possible otherwise from online"""
-    from_date = parser.parse(from_date_str)
-    to_date = parser.parse(to_date_str)
+    from_date = parser.parse(from_date_str).date()
+    if to_date_str:
+        to_date = parser.parse(to_date_str).date()
+    else:
+        #default to_date to yesterday
+        to_date = from_date.today() - timedelta(days=1)
 
-    stored_data = None
+    all_data = get_empty_ohlcv_df()
+    online_data = get_empty_ohlcv_df()
 
     #retrieve data from stored database if we have one
     if stored_retriever:
-        stored_data = stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+        all_data = stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-    if online_retiever:
-        pass
-        #pull data from it if necessary
-        if database:
-            pass
-            #store pulled data
+    #pull extra data if we have one
+    if online_retriever:
+        prior_pull_end_date = needs_former_data(all_data, from_date)
+        if prior_pull_end_date:
+            online_data = online_retriever.fetch_ohlcv(symbol, timeframe, from_date, prior_pull_end_date)
+            database.store_dataframe(online_data)
+            all_data = all_data.append(online_data).sort_index()
 
-    
+        post_pull_from_date = needs_later_data(all_data, to_date)
+        if post_pull_from_date:
+            online_data = online_retriever.fetch_ohlcv(symbol, timeframe, post_pull_from_date, to_date)
+            database.store_dataframe(online_data)
+            all_data = all_data.append(online_data).sort_index()
+
+    return all_data
+
+def needs_former_data(data: Type[pd.DataFrame], from_date: date):
+    if not data:
+        return from_date
+    if from_date not in data.index:
+        return min(data.index) - timedelta(days=1)
+    return None
+
+
+def needs_later_data(data: Type[pd.DataFrame], to_date: date):
+    if not data:
+        return to_date
+    if to_date not in data.index:
+        return min(data.index) + timedelta(days=1)
+    return None
     
 def main_def(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None):
     database = SQLite3OHLCVDatabase()
