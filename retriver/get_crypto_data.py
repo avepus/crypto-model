@@ -43,7 +43,7 @@ def get_empty_ohlcv_df():
     return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index(INDEX_HEADER)
 
 
-class OHLCVDatabase(ABC):
+class OHLCVDatabase(ABC): #need to split into two classes
     @abstractmethod
     def store_dataframe(self, df: Type[pd.DataFrame], test=False) -> None:
         """stores pandas dataframe data into database"""
