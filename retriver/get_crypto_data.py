@@ -18,48 +18,32 @@ import rba_tools.retriver.database as database
 from rba_tools.utils import convert_timeframe_to_ms,get_table_name_from_str,get_table_name_from_dataframe
 import sqlite3
 from pathlib import Path
+from dataclasses import dataclass
 
 DATAFRAME_HEADERS = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
 INDEX_HEADER = 'Timestamp'
-
-timeframe_map_ms = {
-        'm': 60000,
-        'h': 3600000,
-        'd': 86400000,
-        'w': 86400000*7
-    }
-
-def getBinanceExchange():
-    """Gets ccxt class for binance exchange"""
-    exchange_id = 'binance'
-    exchange_class = getattr(ccxt, exchange_id)
-    return exchange_class({
-        'timeout': 30000,
-        'enableRateLimit': True,
-        })
-
 
 def get_empty_ohlcv_df():
     return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index(INDEX_HEADER)
 
 
-class OHLCVDatabase(ABC): #need to split into two classes
+class OHLCVDatabaseInterface(ABC): #need to split into two classes
     @abstractmethod
-    def store_dataframe(self, df: Type[pd.DataFrame], test=False) -> None:
+    def store_dataframe(self, df: pd.DataFrame, timeframe: str) -> None:
         """stores pandas dataframe data into database"""
 
     @abstractmethod
-    def get_query_result_as_dataframe(self, query: str) -> type[pd.DataFrame]:
+    def get_query_result_as_dataframe(self, query: str, timeframe: str) -> pd.DataFrame:
         """executes an SQL query and returns results in dataframe"""
 
-class SQLite3OHLCVDatabase(OHLCVDatabase):
+class SQLite3OHLCVDatabase(OHLCVDatabaseInterface):
 
     def __init__(self, test=False):
         db_file = 'ohlcv_sqlite_test.db' if test else 'ohlcv_sqlite.db'
         self.database_file = str(Path(__file__).parent) + '\\ohlcv_data\\' + db_file
         self.connection = None
         
-    def store_dataframe(self, df: Type[pd.DataFrame]):
+    def store_dataframe(self, df: pd.DataFrame, timeframe: str):
         connection = sqlite3.connect(self.get_database_file())
         table_name = get_table_name_from_dataframe(df)
         try:
@@ -76,12 +60,25 @@ class SQLite3OHLCVDatabase(OHLCVDatabase):
             connection.close()
         return result
 
-    def table_exists(self, table_name: str):
-        query = f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
-        if self._execute_query(query):
-            return True
-        else:
-            return False
+    def create_table_if_not_exists(self, table_name: str) -> None:
+        sql_create_ohlcv_table = f""" CREATE TABLE IF NOT EXISTS {table_name} (
+                                        Symbol string NOT NULL,
+                                        Timestamp integer NOT NULL,
+                                        Open real NOT NULL,
+                                        High real NOT NULL,
+                                        Low real NOT NULL,
+                                        Close real NOT NULL,
+                                        Volume integer NOT NULL,
+                                        Is_Final_Row integer,
+                                        PRIMARY KEY (Symbol, Timestamp)
+                                        CHECK(Is_Final_Row == 0 or Is_Final_Row == 1 or Is_Final_Row is NULL)
+                                    ); """
+        connection = sqlite3.connect(self.get_database_file())
+        try:
+            cursor = connection.cursor()
+            cursor.execute(sql_create_ohlcv_table)
+        finally:
+            connection.close()
 
     def _execute_query(self, query: str):
         """execute and return data from a query. Meant only for troubleshooting"""
@@ -101,7 +98,7 @@ class OHLCVDataRetriver(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
 
     @abstractmethod
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> pd.DataFrame:
         """obtains OHLCV data"""
 
     def get_from_and_to_datetimes(self, from_date: date, to_date: date):
@@ -119,14 +116,14 @@ class CCXTDataRetriver(OHLCVDataRetriver):
                             'enableRateLimit': True,
                             })
     
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: date, to_date: date) -> pd.DataFrame:
         from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
         from_date_ms = convert_datetime_to_UTC_Ms(from_datetime)
         to_date_ms = convert_datetime_to_UTC_Ms(to_datetime)
         data = self.get_all_ccxt_data(symbol, timeframe, from_date_ms, to_date_ms)
         return self.format_ccxt_returned_data(data, symbol, to_datetime)
 
-    def format_ccxt_returned_data(self, data, symbol, to_date) -> Type[pd.DataFrame]:
+    def format_ccxt_returned_data(self, data, symbol, to_date) -> pd.DataFrame:
         """formats the data pulled from ccxt into the expected format"""
         if not data:
             return get_empty_ohlcv_df()
@@ -163,7 +160,7 @@ class CSVDataRetriver(OHLCVDataRetriver):
     def __init__(self, file):
         self.file = file
         
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> pd.DataFrame:
         from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
         data = pd.read_csv(self.file, index_col=INDEX_HEADER, parse_dates=True)
         return self.format_csv_data(data, symbol, from_datetime, to_datetime)
@@ -175,10 +172,10 @@ class CSVDataRetriver(OHLCVDataRetriver):
 class DatabaseRetriver(OHLCVDataRetriver):
     """pulls data from a OHLCVDatabase database"""
     
-    def __init__(self, database: Type[OHLCVDatabase]):
+    def __init__(self, database: Type[OHLCVDatabaseInterface]):
         self.database = database
 
-    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> Type[pd.DataFrame]:
+    def fetch_ohlcv(self, symbol: str, timeframe: str, from_date: datetime, to_date: datetime) -> pd.DataFrame:
         query = self.get_query(symbol, timeframe, from_date, to_date)
         query_result = self.database.get_query_result_as_dataframe(query)
         return self.format_database_data(query_result)
@@ -201,11 +198,11 @@ class DatabaseRetriver(OHLCVDataRetriver):
             {start_condition}
             {end_condition}"""
 
-def checked_retrieved_data(data: Type[pd.DataFrame], symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None):
+def checked_retrieved_data(data: pd.DataFrame, symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None):
     """checks if the data retrieved has all the data"""
 
 
-def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retriever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabase]=None):
+def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[OHLCVDataRetriver]=None, online_retriever: Type[OHLCVDataRetriver]=None, database: Type[OHLCVDatabaseInterface]=None):
     """retrieves a dataframe from saved database if possible otherwise from online"""
     from_date = parser.parse(from_date_str).date()
     if to_date_str:
@@ -237,7 +234,7 @@ def main(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=None,
 
     return all_data
 
-def needs_former_data(data: Type[pd.DataFrame], from_date: date):
+def needs_former_data(data: pd.DataFrame, from_date: date):
     if not data:
         return from_date
     if from_date not in data.index:
@@ -245,7 +242,7 @@ def needs_former_data(data: Type[pd.DataFrame], from_date: date):
     return None
 
 
-def needs_later_data(data: Type[pd.DataFrame], to_date: date):
+def needs_later_data(data: pd.DataFrame, to_date: date):
     if not data:
         return to_date
     if to_date not in data.index:
@@ -266,6 +263,15 @@ def main_def(symbol: str, timeframe: str, from_date_str: str, to_date_str: str=N
 #old code below
 ###########################################################
 
+
+def getBinanceExchange():
+    """Gets ccxt class for binance exchange"""
+    exchange_id = 'binance'
+    exchange_class = getattr(ccxt, exchange_id)
+    return exchange_class({
+        'timeout': 30000,
+        'enableRateLimit': True,
+        })
 
 def fetch_ohlcv_dataframe_from_exchange(symbol, exchange=None, timeFrame = '1d', start_time_ms=None, last_request_time_ms=None):
     """
