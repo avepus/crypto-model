@@ -8,6 +8,7 @@ class Timeframe:
     """timedelta with more convenient initialization and __str__ methods"""
     timeframe: timedelta
     TIMEFRAME_MAP_SEC: ClassVar[dict[int]] = {
+        'S': 1,
         'M': 60,
         'H': 3600,
         'D': 86400,
@@ -23,7 +24,12 @@ class Timeframe:
         return cls(timeframe)
 
     @classmethod
-    def convert_timeframe_string_to_sec(cls,timeframe: str):
+    def from_seconds(cls, seconds: int):
+        timeframe = timedelta(seconds=seconds)
+        return cls(timeframe)
+
+    @classmethod
+    def convert_timeframe_string_to_sec(cls, timeframe: str):
         """Converts timeframe string to seconds
         
         Parameters:
@@ -32,13 +38,12 @@ class Timeframe:
         Returns:
             The timeframe value in seconds
         """
-        timeframe = timeframe.upper()
         #set timeframe to the alpha character in the string
-        timeframe = ''.join(char for char in timeframe if not char.isdigit())
+        timeframe_symbol = ''.join(char for char in timeframe.upper() if not char.isdigit())
         #set factor to the digits
         digits = ''.join(char for char in timeframe if char.isdigit())
         factor = int(digits) if digits else 1
-        return cls.TIMEFRAME_MAP_SEC[timeframe] * factor
+        return cls.TIMEFRAME_MAP_SEC[timeframe_symbol] * factor
 
     def __str__(self):
         return self.timeframe.__str__()
@@ -48,9 +53,8 @@ class Timeframe:
 
     def get_timeframe_name(self):
         """Converts a timeframe string to a the highest time increment"""
-        seconds = self.get_timeframe_seconds()
-        increment_symbol = self.get_highest_time_increment_symbol(seconds)
-        increments = int(seconds / self.TIMEFRAME_MAP_SEC[increment_symbol])
+        increment_symbol = self.get_highest_time_increment_symbol()
+        increments = int(self.get_timeframe_seconds() / self.TIMEFRAME_MAP_SEC[increment_symbol])
         return str(increments) + increment_symbol
 
     def get_highest_time_increment_symbol(self) -> str:
