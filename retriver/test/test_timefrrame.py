@@ -54,8 +54,6 @@ class TestTimeframe(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
-    def test_get_timeframe_name(self):
-        pass
     def test_get_timeframe_name_from_str(self):
         result = Timeframe.from_string('60s').get_timeframe_name()
         expected = '1M'
@@ -85,6 +83,12 @@ class TestTimeframe(unittest.TestCase):
         expected = '7D'
         self.assertEqual(result, expected)
 
+    
+    def test_get_timeframe_table_name(self):
+        result = Timeframe.from_seconds(60).get_timeframe_table_name()
+        expected = 'TIMEFRAME_1M'
+        self.assertEqual(result, expected)
+
 
     def test_get_highest_time_increment_symbol(self):
         result = Timeframe.from_seconds(60).get_highest_time_increment_symbol()
@@ -102,6 +106,9 @@ class TestTimeframe(unittest.TestCase):
         result = Timeframe.from_seconds(60*60*1.5).get_highest_time_increment_symbol()
         expected = 'M'
         self.assertEqual(result, expected)
+
+    
+
 
 if __name__ == "__main__":
     unittest.main()

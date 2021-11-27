@@ -30,14 +30,7 @@ class Timeframe:
 
     @classmethod
     def convert_timeframe_string_to_sec(cls, timeframe: str):
-        """Converts timeframe string to seconds
-        
-        Parameters:
-            timeframe_string (str) -- timeframe string, e.g. 'm' for one minute or '4h' for 4 hours
-
-        Returns:
-            The timeframe value in seconds
-        """
+        """Converts timeframe string to seconds"""
         #set timeframe to the alpha character in the string
         timeframe_symbol = ''.join(char for char in timeframe.upper() if not char.isdigit())
         #set factor to the digits
@@ -46,16 +39,24 @@ class Timeframe:
         return cls.TIMEFRAME_MAP_SEC[timeframe_symbol] * factor
 
     def __str__(self):
+        """implents the timedelta string representation"""
         return self.timeframe.__str__()
 
     def get_timeframe_seconds(self):
         return self.timeframe.total_seconds()
 
     def get_timeframe_name(self):
-        """Converts a timeframe string to a the highest time increment"""
+        """
+        Converts a timeframe to a name with the highest increment
+        and number of increments like 4H
+        """
         increment_symbol = self.get_highest_time_increment_symbol()
         increments = int(self.get_timeframe_seconds() / self.TIMEFRAME_MAP_SEC[increment_symbol])
         return str(increments) + increment_symbol
+
+    def get_timeframe_table_name(self):
+        """Converts a timeframe string to a the highest time increment"""
+        return 'TIMEFRAME_' + self.get_timeframe_name()
 
     def get_highest_time_increment_symbol(self) -> str:
         seconds = self.get_timeframe_seconds()
