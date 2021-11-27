@@ -105,8 +105,9 @@ class Testgcd(unittest.TestCase):
           pd.testing.assert_frame_equal(csv_result, db_retriever_result)
 
      def test_main(self):
-          
-          
+          pass
+
+
 
 
 if __name__ == "__main__":
