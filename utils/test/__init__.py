@@ -1,7 +1,7 @@
 import unittest
 import rba_tools.utils as utils
 from pandas import DataFrame
-import rba_tools.retriver.get_crypto_data as gcd
+import rba_tools.retriever.get_crypto_data as gcd
 from pathlib import Path
 from datetime import datetime
 

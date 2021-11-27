@@ -1,4 +1,4 @@
-from rba_tools.retriver.timeframe import Timeframe
+from rba_tools.retriever.timeframe import Timeframe
 import unittest
 from datetime import timedelta
 

@@ -1,5 +1,5 @@
 import unittest
-import rba_tools.retriver.database as database
+import rba_tools.retriever.database as database
 import sqlite3
 
 class TestDatabase(unittest.TestCase):

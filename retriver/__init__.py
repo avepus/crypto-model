@@ -1,1 +1,0 @@
-from rba_tools.retriver import get_crypto_data as gcd

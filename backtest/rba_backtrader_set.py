@@ -17,7 +17,7 @@ Created on Sun Feb 21 18:05:42 2021
 import backtrader as bt
 from backtrader.utils import num2date
 import rba_tools as rba
-import rba_tools.retriver.get_crypto_data as gcd
+import rba_tools.retriever.get_crypto_data as gcd
 import dash_html_components as html
 import dash_core_components as dcc
 import pandas as pd
