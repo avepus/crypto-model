@@ -18,9 +18,9 @@ class OHLCVDataRetriever(ABC):
         """obtains OHLCV data"""
 
     def get_from_and_to_datetimes(self, from_date: date, to_date: date):
-        from_datetime = datetime.combine(from_date, datetime.min.time())
+        from_datetime = gcd.create_midnight_datetime_from_date(from_date)
         #add one day minus 1 second to get all the data from the end_date. Need for timeframes < 1 day
-        to_datetime = datetime.combine(to_date, datetime.min.time()) + timedelta(seconds = -1, days=1)
+        to_datetime = gcd.create_midnight_datetime_from_date(to_date) + timedelta(seconds = -1, days=1)
         return (from_datetime, to_datetime)
 
 class CCXTDataRetriever(OHLCVDataRetriever):
@@ -112,10 +112,11 @@ class DatabaseRetriever(OHLCVDataRetriever):
 
     def get_query(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime):
         """Generate query based on fetch_ohlcv parameters"""
+        to_date_plus_1 = to_date + timedelta(days=1)
         symbol_condition = "Symbol = '" + symbol + "'"
         table_name = timeframe.get_timeframe_table_name()
         start_condition = f'and {gcd.INDEX_HEADER} >= "{from_date}"'
-        end_condition = f'and {gcd.INDEX_HEADER} <= "{to_date}"'
+        end_condition = f'and {gcd.INDEX_HEADER} < "{to_date_plus_1}"'
         return f"""SELECT * FROM {table_name} 
             WHERE {symbol_condition}
             {start_condition}

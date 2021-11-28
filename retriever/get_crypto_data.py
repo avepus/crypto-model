@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Retrives and stores data in a local sqlite database
+"""Retrieves and stores data in a local sqlite database
 
 Created on Sat Apr 25 22:09:42 2020
 
@@ -19,71 +19,96 @@ import pandas as pd
 DATAFRAME_HEADERS = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
 INDEX_HEADER = 'Timestamp'
 
+def create_midnight_datetime_from_date(_date: date) -> datetime:
+    return datetime.combine(_date, datetime.min.time())
+
 def get_empty_ohlcv_df():
     return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index(INDEX_HEADER)
 
+class DataPuller:
 
-def main(symbol: str, timeframe_str: str, from_date_str: str, to_date_str: str=None, stored_retriever: Type[retrievers.OHLCVDataRetriever]=None, online_retriever: Type[retrievers.OHLCVDataRetriever]=None, database: Type[dbi.OHLCVDatabaseInterface]=None):
-    """retrieves a dataframe from saved database if possible otherwise from online"""
-    timeframe = Timeframe.from_string(timeframe_str)
+    def __init__(self, stored_retriever: Type[retrievers.OHLCVDataRetriever]=None, online_retriever: Type[retrievers.OHLCVDataRetriever]=None, database: Type[dbi.OHLCVDatabaseInterface]=None):
+        self.stored_retriever = stored_retriever
+        self.online_retriever = online_retriever
+        self.database = database
 
-    from_date = parser.parse(from_date_str).date()
-    if to_date_str:
-        to_date = parser.parse(to_date_str).date()
-    else:
-        #default to_date to yesterday
-        to_date = from_date.today() - timedelta(days=1)
+    @classmethod
+    def use_defaults(cls):
+        database = dbi.SQLite3OHLCVDatabase()
+        stored_retriever = retrievers.DatabaseRetriever(database)
+        online_retriever = retrievers.CCXTDataRetriever('binance')
+        return cls(stored_retriever, online_retriever, database)
 
-    all_data = get_empty_ohlcv_df()
-    online_data = get_empty_ohlcv_df()
+    def fetch_df(self, symbol: str, timeframe_str: str, from_date_str: str, to_date_str: str=None):
+        """grabs a pandas dataframe from the stored database if possible and from online otherwise"""
+        symbol = symbol
+        timeframe = Timeframe.from_string(timeframe_str)
+        from_date = parser.parse(from_date_str).date()
+        to_date = parser.parse(to_date_str).date() if to_date_str else datetime.utcnow().date() - timedelta(days=1)
+        all_data = get_empty_ohlcv_df()
 
-    #retrieve data from stored database if we have one
-    if stored_retriever:
-        all_data = stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+        #retrieve data from stored database if we have one
+        if self.stored_retriever:
+            all_data = self.stored_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-    #pull extra data if we have one
-    if online_retriever:
-        prior_pull_end_date = needs_former_data(all_data, from_date)
+        all_data = self.pull_missed_data(all_data, symbol, timeframe, from_date, to_date)
+
+        return all_data
+
+    def pull_missed_data(self, stored_data: pd.DataFrame, symbol: str, timeframe: Timeframe, from_date: date, to_date: date):
+        """pull any missing data from self.online_retriever"""
+        all_data = stored_data
+        prior_pull_end_date = self._get_new_end_date(all_data, from_date)
         if prior_pull_end_date:
-            online_data = online_retriever.fetch_ohlcv(symbol, timeframe, from_date, prior_pull_end_date)
-            database.store_dataframe(online_data, timeframe)
+            online_data = self.online_pull(symbol, timeframe, from_date, prior_pull_end_date)
             all_data = all_data.append(online_data).sort_index()
 
-        post_pull_from_date = needs_later_data(all_data, to_date)
+        post_pull_from_date = self._get_new_from_date(all_data, to_date)
         if post_pull_from_date:
-            online_data = online_retriever.fetch_ohlcv(symbol, timeframe, post_pull_from_date, to_date)
-            database.store_dataframe(online_data, timeframe)
+            online_data = self.online_pull(symbol, timeframe, post_pull_from_date, to_date)
             all_data = all_data.append(online_data).sort_index()
+        return all_data
 
-    return all_data
+    def online_pull(self, symbol: str, timeframe: Timeframe, from_date: date, to_date: date):
+        """perform a data pull from the online_retriever"""
+        if not self.online_retriever:
+            return get_empty_ohlcv_df()
+        online_data = self.online_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+        self.store_dataframe(online_data, timeframe)
+        return online_data
 
-def needs_former_data(data: pd.DataFrame, from_date: date):
-    """returns the new end_date if a prior data pull is necessary"""
-    if data.empty:
-        return from_date
-    if from_date not in data.index:
-        return min(data.index) - timedelta(days=1)
-    return None
+    def store_dataframe(self, data: pd.DataFrame, timeframe: Timeframe):
+        if self.database:
+            self.database.store_dataframe(data, timeframe)
 
-
-def needs_later_data(data: pd.DataFrame, to_date: date):
-    """returns the new from_date if a post data pull is necessary"""
-    if data.empty:
-        return to_date
-    if to_date not in data.index:
-        return min(data.index) + timedelta(days=1)
-    return None
-    
-def main_default(symbol: str, timeframe_str: str, from_date_str: str, to_date_str: str=None):
-    """calls main method with some defaults"""
-    database = dbi.SQLite3OHLCVDatabase()
-    stored_retriver = retrievers.DatabaseRetriever(database)
-    online_retriver = retrievers.CCXTDataRetriever('binance')
-
-    return main(symbol, timeframe_str, from_date_str, to_date_str, stored_retriver, online_retriver, database)
+    def _get_new_end_date(self, data: pd.DataFrame, from_date: date):
+        """returns the new end_date if a prior data pull is necessary"""
+        check_date = create_midnight_datetime_from_date(from_date)
+        if data.empty:
+            return from_date
+        if check_date not in data.index:
+            return min(data.index) - timedelta(days=1)
+        return None
 
 
+    def _get_new_from_date(self, data: pd.DataFrame, to_date: date):
+        """returns the new from_date if a post data pull is necessary"""
+        check_date = create_midnight_datetime_from_date(to_date)
+        if data.empty:
+            return to_date
+        if check_date not in data.index:
+            return max(data.index) + timedelta(days=1)
+        return None
 
+
+if __name__ == '__main__':
+    symbol = 'ETH/BTC'
+    timeframe_str = '1h'
+    from_date_str = '12-1-2020'
+    to_date_str = '12-20-2020'
+    puller = DataPuller.use_defaults()
+
+    result = puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
     
 
 #old code below
@@ -163,10 +188,4 @@ def convert_datetime_to_UTC_Ms(input_datetime=None):
     return int(round(input_datetime.replace(tzinfo = tz.tzutc()).timestamp() * 1000))
    
 
-if __name__ == '__main__':
-    symbol = 'ETH/BTC'
-    timeframe = '1d'
-    from_date = datetime(2019, 12, 1)
-    to_date = datetime(2021, 12, 3)
-    retrievers = retrievers.CCXTDataRetriever('binance')
-    result = retrievers.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
