@@ -35,7 +35,7 @@ class SQLite3OHLCVDatabase(OHLCVDatabaseInterface):
         connection = sqlite3.connect(self.get_database_file())
         result = gcd.get_empty_ohlcv_df()
         try:
-            result = pd.read_sql_query(query, connection)
+            result = pd.read_sql_query(query, connection, index_col=gcd.INDEX_HEADER, parse_dates=[gcd.INDEX_HEADER])
         finally:
             connection.close()
         return result

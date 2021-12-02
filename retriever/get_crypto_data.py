@@ -16,14 +16,14 @@ import rba_tools.retriever.retrievers as retrievers
 from rba_tools.utils import convert_timeframe_to_ms
 import pandas as pd
 
-DATAFRAME_HEADERS = ['Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
+DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
 INDEX_HEADER = 'Timestamp'
 
 def create_midnight_datetime_from_date(_date: date) -> datetime:
     return datetime.combine(_date, datetime.min.time())
 
 def get_empty_ohlcv_df():
-    return pd.DataFrame(columns=DATAFRAME_HEADERS).set_index(INDEX_HEADER)
+    return pd.DataFrame(columns=DATAFRAME_HEADERS, index=pd.DatetimeIndex([], name=INDEX_HEADER))
 
 class DataPuller:
 
@@ -102,6 +102,22 @@ class DataPuller:
 
 
 if __name__ == '__main__':
+    database = dbi.SQLite3OHLCVDatabase(test=True)
+    stored_retriever = retrievers.DatabaseRetriever(database)
+    online_retriever = retrievers.CCXTDataRetriever('binance')
+    puller = DataPuller(stored_retriever, online_retriever, database)
+
+    symbol = 'ETH/BTC'
+    timeframe_str = '1h'
+    from_date_str = '12-1-2020'
+    to_date_str = '12-20-2020'
+
+    result = puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
+
+    file = r'C:\Users\Avery\Documents\GitHub\rba_tools_project\rba_tools\retriever\test\ETH_BTC_1H_2020-1-1.csv'
+    expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
+
+
     symbol = 'ETH/BTC'
     timeframe_str = '1h'
     from_date_str = '12-1-2020'
@@ -110,6 +126,19 @@ if __name__ == '__main__':
 
     result = puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
     
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #old code below
 ###########################################################

@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 import rba_tools.retriever.retrievers as retrievers
 import rba_tools.retriever.database_interface as dbi
+import rba_tools.retriever.get_crypto_data as gcd
 from pathlib import Path
 
 PERFORM_API_TESTS = True
@@ -20,6 +21,21 @@ class TestDatabaseInterface(unittest.TestCase):
         db = dbi.SQLite3OHLCVDatabase(test=True)
         if os.path.exists(db.get_database_file()):
             os.remove(db.get_database_file())
+
+    def test_sqlite3_blank_retrieval(self):
+        symbol = 'ETH/BTC'
+        timeframe = Timeframe.from_string('1D')
+        from_date = datetime(2020, 12, 1)
+        to_date = datetime(2020, 12, 3)
+
+        sqlite3_db = dbi.SQLite3OHLCVDatabase(True)
+
+        db_retriever = retrievers.DatabaseRetriever(sqlite3_db)
+        db_retriever_result = db_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+        expected = gcd.get_empty_ohlcv_df()
+
+        pd.testing.assert_frame_equal(expected, db_retriever_result)
 
     def test_sqlite3_csv_store_and_retrieve(self):
         csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'

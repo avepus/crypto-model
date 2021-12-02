@@ -106,9 +106,8 @@ class DatabaseRetriever(OHLCVDataRetriever):
     def format_database_data(self, data: pd.DataFrame):
         if data.empty:
             return data
-        data[gcd.INDEX_HEADER] = pd.to_datetime(data[gcd.INDEX_HEADER])
         data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
-        return data.set_index(gcd.INDEX_HEADER)
+        return data
 
     def get_query(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime):
         """Generate query based on fetch_ohlcv parameters"""
