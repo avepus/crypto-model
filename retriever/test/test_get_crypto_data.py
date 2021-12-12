@@ -10,6 +10,8 @@ import rba_tools.retriever.database_interface as dbi
 from dateutil import parser
 from pathlib import Path
 
+#would be best to make this use "mock" to get api values without calling. the following line could be used to do
+
 #would be best to make this use "mock" to get api values without calling
 PERFORM_API_TESTS = False
 
@@ -26,8 +28,10 @@ class TestMain(unittest.TestCase):
         self.sqlite_database = dbi.SQLite3OHLCVDatabase(test=True)
         self.sqlite_retriever = retrievers.DatabaseRetriever(self.sqlite_database)
         self.ccxt_retriever = retrievers.CCXTDataRetriever('binance')
-        file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
-        self.csv_retriver = retrievers.CSVDataRetriever(file)
+        self.file_path_1h = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-12-1_to_2020-12-20.csv'
+        self.csv_retriver_1h = retrievers.CSVDataRetriever(self.file_path_1h)
+        self.file_path_1d = str(Path(__file__).parent) + '\ETH_BTC_1D_2020-12-1_to_2020-12-20.csv'
+        self.csv_retriver_1d = retrievers.CSVDataRetriever(self.file_path_1d)
     
     def test_main_online(self):
         if not PERFORM_API_TESTS:
@@ -41,33 +45,62 @@ class TestMain(unittest.TestCase):
 
         result = puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
 
-        file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
-        expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
+        expected = pd.read_csv(self.file_path_1h, parse_dates=True, index_col='Timestamp')
 
         pd.testing.assert_frame_equal(expected, result)
 
 
     def test_main_retrive_and_stored(self):
-        csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver, database=self.sqlite_database)
-        stored_puller = gcd.DataPuller(stored_retriever=self.sqlite_retriever, database=self.sqlite_database)
+        csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
+        stored_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
+                                       stored_retriever=self.sqlite_retriever,
+                                       database=self.sqlite_database)
 
         symbol = 'ETH/BTC'
         timeframe_str = '1h'
         from_date_str = '12-1-2020'
         to_date_str = '12-20-2020'
-
+        
+        csv_result = csv_puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
+        #below we force the csv retriever to return blank because it shouldn't be called at all. This verifies we
+        #use the stored retriever only when all the data we are requesting is available for the stored retriever
         with patch('rba_tools.retriever.get_crypto_data.retrievers.CSVDataRetriever.fetch_ohlcv', return_value=gcd.get_empty_ohlcv_df()):
-            csv_result = csv_puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
-        stored_result = stored_puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
+            stored_result = stored_puller.fetch_df(symbol, timeframe_str, from_date_str, to_date_str)
 
 
-        file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
-        expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
+        expected = pd.read_csv(self.file_path_1h, parse_dates=True, index_col='Timestamp')
 
         pd.testing.assert_frame_equal(expected, csv_result)
         pd.testing.assert_frame_equal(stored_result, csv_result)
 
-    def test_main_online_only(self):
+    def test_main_multiple_timeframe(self):
+        csv_puller_1h = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
+        stored_puller = gcd.DataPuller(stored_retriever=self.sqlite_retriever, database=self.sqlite_database)
+        csv_puller_1d = gcd.DataPuller(online_retriever=self.csv_retriver_1d, database=self.sqlite_database)
+
+        symbol = 'ETH/BTC'
+        timeframe_str_1h = '1h'
+        timeframe_str_1d = '1d'
+        from_date_str = '12-1-2020'
+        to_date_str = '12-20-2020'
+        
+        #fetch the data so it is stored on the database
+        csv_result_1h = csv_puller_1h.fetch_df(symbol, timeframe_str_1h, from_date_str, to_date_str)
+        csv_result_1d = csv_puller_1d.fetch_df(symbol, timeframe_str_1d, from_date_str, to_date_str)
+        #retrieve the stored data while having multiple timeframes in that date range
+        stored_result_1d = stored_puller.fetch_df(symbol, timeframe_str_1d, from_date_str, to_date_str)
+        stored_result_1h = stored_puller.fetch_df(symbol, timeframe_str_1h, from_date_str, to_date_str)
+
+        expected_1h = pd.read_csv(self.file_path_1h, parse_dates=True, index_col='Timestamp')
+        expected_1d = pd.read_csv(self.file_path_1d, parse_dates=True, index_col='Timestamp')
+
+        pd.testing.assert_frame_equal(expected_1h, stored_result_1h)
+        pd.testing.assert_frame_equal(expected_1d, stored_result_1d)
+
+    def test_main_data_store_retrieve_prior(self):
+        pass
+
+    def test_main_data_store_retrieve_later(self):
         pass
 
 

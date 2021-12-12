@@ -58,7 +58,7 @@ class DataPuller:
     def pull_missed_data(self, stored_data: pd.DataFrame, symbol: str, timeframe: Timeframe, from_date: date, to_date: date):
         """pull any missing data from self.online_retriever"""
         all_data = stored_data
-        prior_pull_end_date = self._get_new_end_date(all_data, from_date)
+        prior_pull_end_date = self._get_new_end_date(all_data, from_date, to_date)
         if prior_pull_end_date:
             online_data = self.online_pull(symbol, timeframe, from_date, prior_pull_end_date)
             all_data = all_data.append(online_data).sort_index()
@@ -81,11 +81,11 @@ class DataPuller:
         if self.database:
             self.database.store_dataframe(data, timeframe)
 
-    def _get_new_end_date(self, data: pd.DataFrame, from_date: date):
+    def _get_new_end_date(self, data: pd.DataFrame, from_date: date, to_date: date):
         """returns the new end_date if a prior data pull is necessary"""
         check_date = create_midnight_datetime_from_date(from_date)
         if data.empty:
-            return from_date
+            return to_date
         if check_date not in data.index:
             return min(data.index) - timedelta(days=1)
         return None
@@ -95,7 +95,7 @@ class DataPuller:
         """returns the new from_date if a post data pull is necessary"""
         check_date = create_midnight_datetime_from_date(to_date)
         if data.empty:
-            return to_date
+            return None
         if check_date not in data.index:
             return max(data.index) + timedelta(days=1)
         return None
