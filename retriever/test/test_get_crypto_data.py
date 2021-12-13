@@ -2,13 +2,14 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 from rba_tools.retriever.timeframe import Timeframe
-from datetime import datetime
+from datetime import datetime,timedelta
 import os
 import rba_tools.retriever.get_crypto_data as gcd
 import rba_tools.retriever.retrievers as retrievers
 import rba_tools.retriever.database_interface as dbi
 from dateutil import parser
 from pathlib import Path
+from unittest.mock import MagicMock
 
 #would be best to make this use "mock" to get api values without calling. the following line could be used to do
 
@@ -98,7 +99,55 @@ class TestMain(unittest.TestCase):
         pd.testing.assert_frame_equal(expected_1d, stored_result_1d)
 
     def test_main_data_store_retrieve_prior(self):
-        pass
+        csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
+        puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
+                                       stored_retriever=self.sqlite_retriever,
+                                       database=self.sqlite_database)
+
+        symbol = 'ETH/BTC'
+        timeframe_str = '1h'
+        full_from_date_str = '12-1-2020'
+        full_to_date_str = '12-20-2020'
+        partial_from_date_str = '12-5-2020'
+        partial_to_date_str = '12-10-2020'
+        
+        #fetch the middle data so it is stored on the database
+        csv_result = csv_puller.fetch_df(symbol, timeframe_str, partial_from_date_str, partial_to_date_str)
+        #retrieve the stored data while having multiple timeframes in that date range
+        
+        result = puller.fetch_df(symbol, timeframe_str, full_from_date_str, full_to_date_str)
+        expected = pd.read_csv(self.file_path_1h, parse_dates=True, index_col='Timestamp')
+
+        pd.testing.assert_frame_equal(expected, result)
+
+    def test_main_data_store_retrieve_prior_verify_call(self):
+        csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
+        puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
+                                       stored_retriever=self.sqlite_retriever,
+                                       database=self.sqlite_database)
+
+        day = timedelta(days=1)
+        symbol = 'ETH/BTC'
+        timeframe_str = '1h'
+        tf = Timeframe.from_string(timeframe_str)
+        full_from_date_str = '12-1-2020'
+        full_from_date = parser.parse(full_from_date_str).date()
+        full_to_date_str = '12-20-2020'
+        full_to_date = parser.parse(full_to_date_str).date()
+        partial_from_date_str = '12-5-2020'
+        partial_from_date = (parser.parse(partial_from_date_str) - day).date()
+        partial_to_date_str = '12-10-2020'
+        partial_to_date = (parser.parse(partial_to_date_str) + day).date()
+        
+        
+        #fetch the middle data so it is stored on the database
+        csv_result = csv_puller.fetch_df(symbol, timeframe_str, partial_from_date_str, partial_to_date_str)
+        #retrieve the stored data while having multiple timeframes in that date range
+        puller.online_pull = MagicMock(return_value=gcd.get_empty_ohlcv_df())
+        result = puller.fetch_df(symbol, timeframe_str, full_from_date_str, full_to_date_str)
+
+        puller.online_pull.assert_called_with(symbol, tf, full_from_date, partial_from_date_str)
+        puller.online_pull.assert_called_with(symbol, tf, partial_to_date, full_to_date)
 
     def test_main_data_store_retrieve_later(self):
         pass

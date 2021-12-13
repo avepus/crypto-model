@@ -64,3 +64,9 @@ class Timeframe:
         if seconds % self.TIMEFRAME_MAP_SEC['H'] == 0: return 'H'
         if seconds % self.TIMEFRAME_MAP_SEC['M'] == 0: return 'M'
         else: raise ValueError(f"timeframe value of {seconds} seconds is invalid")
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.timeframe == other.timeframe
+        return False
+    
