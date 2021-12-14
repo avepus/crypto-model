@@ -46,7 +46,7 @@ class TestRetriever(unittest.TestCase):
           retriever = retrievers.CCXTDataRetriever('binance')
           result = retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-          file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-1-1.csv'
+          file = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-12-1_to_2020-12-20.csv'
           expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
 
           pd.testing.assert_frame_equal(result, expected)

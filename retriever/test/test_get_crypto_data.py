@@ -11,8 +11,6 @@ from dateutil import parser
 from pathlib import Path
 from unittest.mock import MagicMock
 
-#would be best to make this use "mock" to get api values without calling. the following line could be used to do
-
 #would be best to make this use "mock" to get api values without calling
 PERFORM_API_TESTS = False
 
@@ -21,12 +19,11 @@ PERFORM_API_TESTS = False
 class TestMain(unittest.TestCase):
 
     def setUp(self):
-        """clear out test data if it exists"""
-        db = dbi.SQLite3OHLCVDatabase(test=True)
-        if os.path.exists(db.get_database_file()):
-            os.remove(db.get_database_file())
-
         self.sqlite_database = dbi.SQLite3OHLCVDatabase(test=True)
+        self.sqlite_database = dbi.SQLite3OHLCVDatabase(test=True)
+        if os.path.exists(self.sqlite_database.get_database_file()):
+            os.remove(self.sqlite_database.get_database_file())
+
         self.sqlite_retriever = retrievers.DatabaseRetriever(self.sqlite_database)
         self.ccxt_retriever = retrievers.CCXTDataRetriever('binance')
         self.file_path_1h = str(Path(__file__).parent) + '\ETH_BTC_1H_2020-12-1_to_2020-12-20.csv'
@@ -35,6 +32,7 @@ class TestMain(unittest.TestCase):
         self.csv_retriver_1d = retrievers.CSVDataRetriever(self.file_path_1d)
     
     def test_main_online(self):
+        """test pulling data from online source"""
         if not PERFORM_API_TESTS:
             return
         puller = gcd.DataPuller(online_retriever=self.ccxt_retriever)
@@ -52,6 +50,7 @@ class TestMain(unittest.TestCase):
 
 
     def test_main_retrive_and_stored(self):
+        """verify we pull stored data even when an online retriever is available"""
         csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
         stored_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
                                        stored_retriever=self.sqlite_retriever,
@@ -75,6 +74,7 @@ class TestMain(unittest.TestCase):
         pd.testing.assert_frame_equal(stored_result, csv_result)
 
     def test_main_multiple_timeframe(self):
+        """test retrieving data from a period in which multiple timeframes of data exist"""
         csv_puller_1h = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
         stored_puller = gcd.DataPuller(stored_retriever=self.sqlite_retriever, database=self.sqlite_database)
         csv_puller_1d = gcd.DataPuller(online_retriever=self.csv_retriver_1d, database=self.sqlite_database)
@@ -99,6 +99,7 @@ class TestMain(unittest.TestCase):
         pd.testing.assert_frame_equal(expected_1d, stored_result_1d)
 
     def test_main_data_store_retrieve_prior(self):
+        """verify that we pull prior and later data if we have middle data stored"""
         csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
         puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
                                        stored_retriever=self.sqlite_retriever,
@@ -121,6 +122,7 @@ class TestMain(unittest.TestCase):
         pd.testing.assert_frame_equal(expected, result)
 
     def test_main_data_store_retrieve_prior_verify_call(self):
+        """identical to above test but here we verify that calls have been made"""
         csv_puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h, database=self.sqlite_database)
         puller = gcd.DataPuller(online_retriever=self.csv_retriver_1h,
                                        stored_retriever=self.sqlite_retriever,
@@ -146,11 +148,8 @@ class TestMain(unittest.TestCase):
         puller.online_pull = MagicMock(return_value=gcd.get_empty_ohlcv_df())
         result = puller.fetch_df(symbol, timeframe_str, full_from_date_str, full_to_date_str)
 
-        puller.online_pull.assert_called_with(symbol, tf, full_from_date, partial_from_date_str)
+        puller.online_pull.assert_any_call(symbol, tf, full_from_date, partial_from_date)
         puller.online_pull.assert_called_with(symbol, tf, partial_to_date, full_to_date)
-
-    def test_main_data_store_retrieve_later(self):
-        pass
 
 
 if __name__ == "__main__":
