@@ -31,10 +31,10 @@ class TestStrategy(bt.Strategy):
         #self.maslope = rbsind.Slope(ma)
         #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
         #self.con_bars = rbsind.TrendInfo(self.data)
-        self.in_trend = rbsind.InTrend(self.data)
-        self.retrace_percent = rbsind.Retrace_Percent(self.data)
-        self.trend_high = rbsind.Trend_High(self.data)
-        self.trend_open = rbsind.Trend_Open(self.data)
+        self.in_trend = inTrend = rbsind.InTrend(self.data1)
+        self.retrace_percent = rbsind.Retrace_Percent(self.data1)
+        self.trend_high = rbsind.Trend_High(self.data1)
+        self.trend_open = rbsind.Trend_Open(self.data1)
         if self.params.debug:
             open('run_log.txt', 'w').close() #clear out file at during init if we're writing to file
 
@@ -107,7 +107,7 @@ class TestStrategy(bt.Strategy):
             self.debug_print()
         # Check if we are in the market
         if not self.position:
-            if self.in_trend.trend_retrace[0] < 50:
+            if self.in_trend.trend_retrace.s1() < 50:
                 o1 = self.buy()
                 #self.log('o1=' + str(o1))
                 o2 = self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
@@ -117,5 +117,5 @@ class TestStrategy(bt.Strategy):
                 #self.log('o3=' + str(o3))
         else:
             #if there is no trend then close
-            if isnan(self.in_trend.trend_retrace[0]):
+            if isnan(self.in_trend.trend_retrace.s1()):
                 self.close()
