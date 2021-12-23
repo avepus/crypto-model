@@ -1,5 +1,6 @@
 .vs
 .idea
 .vscode
+.coverage
 __pycache__
 venv
