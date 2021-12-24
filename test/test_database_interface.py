@@ -1,11 +1,19 @@
+# -*- coding: utf-8 -*-
+"""Tests for database_interface
+
+Created on Sat Nov 01 2021
+
+@author: Avery
+
+"""
+import os
 import unittest
 import pandas as pd
 from rba_tools.retriever.timeframe import Timeframe
 from datetime import datetime
-import os
 import rba_tools.retriever.retrievers as retrievers
 import rba_tools.retriever.database_interface as dbi
-import rba_tools.retriever.get_crypto_data as gcd
+from rba_tools.retriever.constants import empty_ohlcv_df_generator
 from pathlib import Path
 
 PERFORM_API_TESTS = True
@@ -33,7 +41,7 @@ class TestDatabaseInterface(unittest.TestCase):
         db_retriever = retrievers.DatabaseRetriever(sqlite3_db)
         db_retriever_result = db_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
 
-        expected = gcd.get_empty_ohlcv_df()
+        expected = empty_ohlcv_df_generator()
 
         pd.testing.assert_frame_equal(expected, db_retriever_result)
 

@@ -107,6 +107,9 @@ class TestTimeframe(unittest.TestCase):
         expected = 'M'
         self.assertEqual(result, expected)
 
+    def test_eq(self):
+        self.assertTrue(Timeframe.from_seconds(60) == Timeframe.from_seconds(60))
+
     
 
 

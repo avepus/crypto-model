@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import sqlite3
 from rba_tools.retriever.timeframe import Timeframe
-import rba_tools.retriever.get_crypto_data as gcd
+import rba_tools.retriever.constants as constants
 from pathlib import Path
 
 class OHLCVDatabaseInterface(ABC):
@@ -33,9 +33,9 @@ class SQLite3OHLCVDatabase(OHLCVDatabaseInterface):
     def get_query_result_as_dataframe(self, query: str, timeframe: Timeframe):
         self.create_OHLCV_table_if_not_exists(timeframe)
         connection = sqlite3.connect(self.get_database_file())
-        result = gcd.get_empty_ohlcv_df()
+        result = constants.empty_ohlcv_df_generator()
         try:
-            result = pd.read_sql_query(query, connection, index_col=gcd.INDEX_HEADER, parse_dates=[gcd.INDEX_HEADER])
+            result = pd.read_sql_query(query, connection, index_col=constants.INDEX_HEADER, parse_dates=[constants.INDEX_HEADER])
         finally:
             connection.close()
         return result

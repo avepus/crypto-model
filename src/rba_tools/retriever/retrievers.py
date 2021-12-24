@@ -8,7 +8,7 @@ from datetime import datetime, date, timedelta
 from dateutil import tz
 from rba_tools.retriever.timeframe import Timeframe
 import rba_tools.retriever.database_interface as dbi
-import rba_tools.retriever.get_crypto_data as gcd
+import rba_tools.retriever.constants as constants
 
 class OHLCVDataRetriever(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
@@ -18,9 +18,9 @@ class OHLCVDataRetriever(ABC):
         """obtains OHLCV data"""
 
     def get_from_and_to_datetimes(self, from_date: date, to_date: date):
-        from_datetime = gcd.create_midnight_datetime_from_date(from_date)
+        from_datetime = constants.create_midnight_datetime_from_date(from_date)
         #add one day minus 1 second to get all the data from the end_date. Need for timeframes < 1 day
-        to_datetime = gcd.create_midnight_datetime_from_date(to_date) + timedelta(seconds = -1, days=1)
+        to_datetime = constants.create_midnight_datetime_from_date(to_date) + timedelta(seconds = -1, days=1)
         return (from_datetime, to_datetime)
 
 class CCXTDataRetriever(OHLCVDataRetriever):
@@ -42,9 +42,9 @@ class CCXTDataRetriever(OHLCVDataRetriever):
     def format_ccxt_returned_data(self, data, symbol, to_date) -> pd.DataFrame:
         """formats the data pulled from ccxt into the expected format"""
         if not data:
-            return gcd.get_empty_ohlcv_df()
-        header = [gcd.INDEX_HEADER, 'Open', 'High', 'Low', 'Close', 'Volume']
-        df = pd.DataFrame(data, columns=header).set_index(gcd.INDEX_HEADER)
+            return constants.empty_ohlcv_df_generator()
+        header = [constants.INDEX_HEADER, 'Open', 'High', 'Low', 'Close', 'Volume']
+        df = pd.DataFrame(data, columns=header).set_index(constants.INDEX_HEADER)
         df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
         df['Is_Final_Row'] = np.nan
@@ -85,7 +85,7 @@ class CSVDataRetriever(OHLCVDataRetriever):
         
     def fetch_ohlcv(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime) -> pd.DataFrame:
         from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
-        data = pd.read_csv(self.file, index_col=gcd.INDEX_HEADER, parse_dates=True)
+        data = pd.read_csv(self.file, index_col=constants.INDEX_HEADER, parse_dates=True)
         return self.format_csv_data(data, symbol, from_datetime, to_datetime)
 
     def format_csv_data(self, data, symbol: str, from_date: datetime, to_date: datetime):
@@ -114,8 +114,8 @@ class DatabaseRetriever(OHLCVDataRetriever):
         to_date_plus_1 = to_date + timedelta(days=1)
         symbol_condition = "Symbol = '" + symbol + "'"
         table_name = timeframe.get_timeframe_table_name()
-        start_condition = f'and {gcd.INDEX_HEADER} >= "{from_date}"'
-        end_condition = f'and {gcd.INDEX_HEADER} < "{to_date_plus_1}"'
+        start_condition = f'and {constants.INDEX_HEADER} >= "{from_date}"'
+        end_condition = f'and {constants.INDEX_HEADER} < "{to_date_plus_1}"'
         return f"""SELECT * FROM {table_name} 
             WHERE {symbol_condition}
             {start_condition}
