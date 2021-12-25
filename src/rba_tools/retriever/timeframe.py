@@ -1,13 +1,19 @@
+# -*- coding: utf-8 -*-
+"""Contains Timeframe class
 
+Created on Sat Nov 01 2021
+
+@author: Avery
+
+"""
 
 from typing import ClassVar
 from datetime import timedelta
 
-
 class Timeframe:
     """timedelta with more convenient initialization and __str__ methods"""
     timeframe: timedelta
-    TIMEFRAME_MAP_SEC: ClassVar[dict[int]] = {
+    TIMEFRAME_MAP_SEC: ClassVar[dict[str, int]] = {
         'S': 1,
         'M': 60,
         'H': 3600,
@@ -17,14 +23,16 @@ class Timeframe:
 
     def __init__(self, timeframe: timedelta):
         self.timeframe = timeframe
-    
+
     @classmethod
     def from_string(cls, timeframe: str):
+        """create timeframe from a string, e.g. 5m for 5 minutes"""
         timeframe = timedelta(seconds=cls.convert_timeframe_string_to_sec(timeframe))
         return cls(timeframe)
 
     @classmethod
     def from_seconds(cls, seconds: int):
+        """create timeframe from a string, e.g. 5m for 5 minutes"""
         timeframe = timedelta(seconds=seconds)
         return cls(timeframe)
 
@@ -43,6 +51,7 @@ class Timeframe:
         return self.timeframe.__str__()
 
     def get_timeframe_seconds(self):
+        """Retreieve number of seconds in timeframe"""
         return self.timeframe.total_seconds()
 
     def get_timeframe_name(self):
@@ -59,6 +68,7 @@ class Timeframe:
         return 'TIMEFRAME_' + self.get_timeframe_name()
 
     def get_highest_time_increment_symbol(self) -> str:
+        """Rerieves the highest timeframe that the seconds can be divided into"""
         seconds = self.get_timeframe_seconds()
         if seconds % self.TIMEFRAME_MAP_SEC['D'] == 0: return 'D'
         if seconds % self.TIMEFRAME_MAP_SEC['H'] == 0: return 'H'
