@@ -4,3 +4,4 @@
 .coverage
 __pycache__
 venv
+src/rba_tools.egg-info
