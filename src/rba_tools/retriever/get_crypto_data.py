@@ -27,7 +27,7 @@ class DataPuller:
     def use_defaults(cls):
         database = dbi.SQLite3OHLCVDatabase()
         stored_retriever = retrievers.DatabaseRetriever(database)
-        online_retriever = retrievers.CCXTDataRetriever('binance')
+        online_retriever = retrievers.CCXTDataRetriever('kraken')
         return cls(stored_retriever, online_retriever, database)
 
     def fetch_df(self, symbol: str, timeframe_str: str, from_date_str: str, to_date_str: str=None):

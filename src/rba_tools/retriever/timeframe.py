@@ -46,26 +46,13 @@ class Timeframe:
         factor = int(digits) if digits else 1
         return cls.TIMEFRAME_MAP_SEC[timeframe_symbol] * factor
 
-    def __str__(self):
-        """implents the timedelta string representation"""
-        return self.timeframe.__str__()
-
     def get_timeframe_seconds(self):
         """Retreieve number of seconds in timeframe"""
         return self.timeframe.total_seconds()
 
-    def get_timeframe_name(self):
-        """
-        Converts a timeframe to a name with the highest increment
-        and number of increments like 4H
-        """
-        increment_symbol = self.get_highest_time_increment_symbol()
-        increments = int(self.get_timeframe_seconds() / self.TIMEFRAME_MAP_SEC[increment_symbol])
-        return str(increments) + increment_symbol
-
     def get_timeframe_table_name(self):
         """Converts a timeframe string to a the highest time increment"""
-        return 'TIMEFRAME_' + self.get_timeframe_name()
+        return 'TIMEFRAME_' + str(self)
 
     def get_highest_time_increment_symbol(self) -> str:
         """Rerieves the highest timeframe that the seconds can be divided into"""
@@ -74,6 +61,15 @@ class Timeframe:
         if seconds % self.TIMEFRAME_MAP_SEC['H'] == 0: return 'H'
         if seconds % self.TIMEFRAME_MAP_SEC['M'] == 0: return 'M'
         else: raise ValueError(f"timeframe value of {seconds} seconds is invalid")
+
+    def __str__(self):
+        """
+        Converts a timeframe to a name with the highest increment
+        and number of increments like 4H
+        """
+        increment_symbol = self.get_highest_time_increment_symbol()
+        increments = int(self.get_timeframe_seconds() / self.TIMEFRAME_MAP_SEC[increment_symbol])
+        return str(increments) + increment_symbol
 
     def __eq__(self, other):
         if type(other) is type(self):

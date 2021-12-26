@@ -1,9 +1,8 @@
-import argparse
+
 
 import backtrader as bt
 import backtrader.feeds as btfeeds
 
-import pandas as pd
 import rba_tools.retriever.get_crypto_data as gcd
 import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
 
@@ -17,9 +16,11 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
     # Add a strategy
     cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
 
+    #get a datapuller
+    puller = gcd.DataPuller.use_defaults()
+
     # Get a pandas dataframe
-    binance = gcd.getBinanceExchange()
-    dataframe = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/19', '12/31/19')
+    dataframe = puller.fetch_df('ETH/BTC', 'd', '1/1/19', '12/31/19')
 
     # Pass it to the backtrader datafeed and add it to the cerebro
     data = bt.feeds.PandasData(dataname=dataframe,
@@ -27,16 +28,16 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
                                )
     cerebro.adddata(data)
 
-    replay_df = gcd.get_DataFrame(['ETH/BTC'], binance, '1/1/19', '12/31/19', timeframe='1h')
+    # replay_df = puller.fetch_df('ETH/BTC', 'h', '1/1/19', '12/31/19')
 
-    replay_data = bt.feeds.PandasData(dataname=replay_df,
-                               nocase=True,
-                               )
+    # replay_data = bt.feeds.PandasData(dataname=replay_df,
+    #                            nocase=True,
+    #                            )
 
-    cerebro.replaydata(replay_data, timeframe=bt.TimeFrame.Minutes, compression=60)
+    # cerebro.replaydata(replay_data, timeframe=bt.TimeFrame.Minutes, compression=60)
 
     # Run over everything
-    strats = cerebro.run()
+    cerebro.run()
 
     # Plot the result
     if plot:

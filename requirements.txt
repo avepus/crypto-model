@@ -1,4 +1,6 @@
 pandas
 ccxt
 tox
+plotly
+backtrader
 -e .
