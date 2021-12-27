@@ -1,6 +1,6 @@
 from pandas import DataFrame, DatetimeIndex
 from datetime import datetime,date
-DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol', 'Is_Final_Row']
+DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol']
 INDEX_HEADER = 'Timestamp'
 
 def empty_ohlcv_df_generator():

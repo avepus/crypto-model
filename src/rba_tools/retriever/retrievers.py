@@ -50,7 +50,6 @@ class CCXTDataRetriever(OHLCVDataRetriever):
         df = pd.DataFrame(data, columns=header).set_index(constants.INDEX_HEADER)
         df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
-        df['Is_Final_Row'] = np.nan
         return df.loc[:to_date].copy()
 
     def get_all_ccxt_data(self, symbol: str, timeframe: Timeframe, from_date_ms: int, to_date_ms: int):
@@ -109,7 +108,6 @@ class DatabaseRetriever(OHLCVDataRetriever):
     def format_database_data(self, data: pd.DataFrame):
         if data.empty:
             return data
-        data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
         return data
 
     def get_query(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime):
@@ -148,7 +146,6 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
     def format_kraken_data(self, data: pd.DataFrame, symbol: str, from_date: datetime, to_date: datetime):
         data.index = pd.to_datetime(data.index, unit='s')
         data['Symbol'] = symbol
-        data['Is_Final_Row'] = np.nan
         return data.loc[from_date:to_date]
 
     def _get_kraken_csv_file(self, symbol: str, timeframe: Timeframe):
