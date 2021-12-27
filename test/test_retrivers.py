@@ -3,6 +3,7 @@ import pandas as pd
 from rba_tools.retriever.timeframe import Timeframe
 from datetime import datetime
 import os
+from rba_tools.exceptions import KrakenFileNotFoundError
 import rba_tools.retriever.get_crypto_data as gcd
 import rba_tools.retriever.retrievers as retrievers
 import rba_tools.retriever.database_interface as dbi
@@ -22,6 +23,7 @@ class TestRetriever(unittest.TestCase):
             os.remove(db.get_database_file())
 
     def test_CSVDataRetriever(self):
+        """test a simple csv retreiver data pull"""
         csv_file = str(Path(__file__).parent) + '\\ETH_BTC_1D_12-1-20_to-12-3-20.csv'
         retriever = retrievers.CSVDataRetriever(csv_file)
         symbol = 'ETH/BTC'
@@ -69,6 +71,7 @@ class TestRetriever(unittest.TestCase):
         pd.testing.assert_frame_equal(result, expected)
 
     def test_Retreivers_Return_Equal(self):
+        """test that csv, ccxt, and database retriever all match"""
         if not PERFORM_API_TESTS:
             return
 
@@ -94,6 +97,7 @@ class TestRetriever(unittest.TestCase):
         pd.testing.assert_frame_equal(db_retriever_result, ccxt_result)
 
     def test_kraken_retreiver(self):
+        """basic test of retrieving kraken data"""
         kraken_retriever = retrievers.KrakenOHLCVTZipRetriever()
         symbol = 'ETH/USD'
         timeframe = Timeframe.from_string('1D')
@@ -106,6 +110,11 @@ class TestRetriever(unittest.TestCase):
 
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_kraken_retreiver_exception(self):
+        """test kraken file not found"""
+        self.assertRaises(KrakenFileNotFoundError, retrievers.KrakenOHLCVTZipRetriever, 'badfilename')
+
 
 if __name__ == "__main__":
     unittest.main()
+#1606780800

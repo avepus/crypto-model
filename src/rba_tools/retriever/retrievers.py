@@ -148,6 +148,7 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
     def format_kraken_data(self, data: pd.DataFrame, symbol: str, from_date: datetime, to_date: datetime):
         data.index = pd.to_datetime(data.index, unit='s')
         data['Symbol'] = symbol
+        data['Is_Final_Row'] = np.nan
         return data.loc[from_date:to_date]
 
     def _get_kraken_csv_file(self, symbol: str, timeframe: Timeframe):
