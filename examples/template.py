@@ -17,10 +17,10 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
     cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
 
     #get a datapuller
-    puller = gcd.DataPuller.use_defaults()
+    puller = gcd.DataPuller.kraken_puller()
 
     # Get a pandas dataframe
-    dataframe = puller.fetch_df('ETH/BTC', 'd', '1/1/19', '12/31/19')
+    dataframe = puller.fetch_df('ETH/USD', 'd', '1/1/20', '12/31/21')
 
     # Pass it to the backtrader datafeed and add it to the cerebro
     data = bt.feeds.PandasData(dataname=dataframe,

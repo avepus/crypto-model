@@ -4,4 +4,5 @@
 .coverage
 __pycache__
 venv
+run_log.txt
 src/rba_tools.egg-info
