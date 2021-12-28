@@ -110,6 +110,20 @@ class TestRetriever(unittest.TestCase):
 
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_kraken_retreiver_hour(self):
+        """hourly test of retreiving kraken data"""
+        kraken_retriever = retrievers.KrakenOHLCVTZipRetriever()
+        symbol = 'ETH/USD'
+        timeframe = Timeframe.from_string('1h')
+        from_date = datetime(2020, 12, 1)
+        to_date = datetime(2020, 12, 3)
+        result = kraken_retriever.fetch_ohlcv(symbol, timeframe, from_date, to_date)
+
+        file = str(Path(__file__).parent) + '\Kraken_ETCUSD_60.csv'
+        expected = pd.read_csv(file, parse_dates=True, index_col='Timestamp')
+
+        pd.testing.assert_frame_equal(result, expected)
+
     def test_kraken_retreiver_exception(self):
         """test kraken file not found"""
         self.assertRaises(KrakenFileNotFoundError, retrievers.KrakenOHLCVTZipRetriever, 'badfilename')

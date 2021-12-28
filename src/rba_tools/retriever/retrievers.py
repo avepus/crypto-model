@@ -136,12 +136,13 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
         
 
     def fetch_ohlcv(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime) -> pd.DataFrame:
+        from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
         krakenk_zip_file = ZipFile(self.kraken_file)
         kraken_headers = [constants.INDEX_HEADER]
         kraken_headers.extend(constants.DATAFRAME_HEADERS)
         kraken_csv_file = self._get_kraken_csv_file(symbol, timeframe)
         result = pd.read_csv(krakenk_zip_file.open(kraken_csv_file), index_col=0, names=kraken_headers)
-        return self.format_kraken_data(result, symbol, from_date, to_date)
+        return self.format_kraken_data(result, symbol, from_datetime, to_datetime)
 
     def format_kraken_data(self, data: pd.DataFrame, symbol: str, from_date: datetime, to_date: datetime):
         data.index = pd.to_datetime(data.index, unit='s')

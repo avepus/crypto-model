@@ -17,6 +17,16 @@ class StopLimitEntryStrategy(bt.Strategy):
 class TrailingStopStrategy(bt.Strategy):
     pass
 
+class ConsecutiveBarsTest(bt.Strategy):
+
+    def __init__(self):
+        # self.sma0 = bt.ind.SMA(self.data0, period=10)
+        # self.sma1 = bt.ind.SMA(self.data1, period=10)
+        #self.consec0 = rbsind.ConsecutiveBars(self.data0)
+        self.consec1 = rbsind.ConsecutiveBars(self.data1)
+
+        
+
 class TestStrategy(bt.Strategy):
 
     params = (
@@ -27,14 +37,14 @@ class TestStrategy(bt.Strategy):
         )
 
     def __init__(self):
-        ma = bt.ind.SMA(period = 10)
+        # ma = bt.ind.SMA(period = 10)
         #self.maslope = rbsind.Slope(ma)
         #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
         #self.con_bars = rbsind.TrendInfo(self.data)
-        self.in_trend = rbsind.InTrend(self.data)
-        self.retrace_percent = rbsind.Retrace_Percent(self.data)
-        self.trend_high = rbsind.Trend_High(self.data)
-        self.trend_open = rbsind.Trend_Open(self.data)
+        self.in_trend = rbsind.InTrend(self.data1)
+        self.retrace_percent = rbsind.Retrace_Percent(self.data1)
+        self.trend_high = rbsind.Trend_High(self.data1)
+        self.trend_open = rbsind.Trend_Open(self.data1)
         if self.params.debug:
             open('run_log.txt', 'w').close() #clear out file at during init if we're writing to file
 

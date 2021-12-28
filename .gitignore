@@ -6,3 +6,4 @@ __pycache__
 venv
 run_log.txt
 src/rba_tools.egg-info
+rba_tools.egg-info

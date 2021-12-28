@@ -96,6 +96,9 @@ class InTrend(bt.Indicator):
     def next(self):
         consecutive_bar_start = int(-1 * self.lines.consec_bars[-1])
 
+        if consecutive_bar_start > len(self.data) - 1:
+            return
+        
         if self.lines.consec_bars[0] == -1:
             #we just turned down, need to check if this is a new trend
             over_min_bars = self.lines.consec_bars[-1] > self.p.minimum_bars
