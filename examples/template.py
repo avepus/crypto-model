@@ -15,7 +15,7 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
 
     # Add a strategy
     #cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
-    cerebro.addstrategy(rbsstrat.TestStrategy)
+    cerebro.addstrategy(rbsstrat.ConsecutiveBarsTest)
 
     #get a datapuller
     puller = gcd.DataPuller.kraken_puller()
