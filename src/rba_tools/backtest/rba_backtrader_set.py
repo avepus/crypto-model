@@ -44,7 +44,7 @@ class MaCrossStrategy(bt.Strategy):
 
 class backtrader_set():
 
-    def __init__(self, symbols, strategy, sizer, sizer_param, start_date_str, end_date_str, exchange=None, starting_cash=1000.0):
+    def __init__(self, symbols, strategy, sizer, sizer_param, start_date_str, end_date_str, timeframe_str='1d', datapuller=None, starting_cash=1000.0):
         """
         Creates a backtrader_set instance for retriving, running analysis, and displaying results
         
@@ -55,6 +55,7 @@ class backtrader_set():
             sizer_param (any) -- parameter for sizer
             start_date_str (str) -- start date of analysis time period as a string
             end_date_str (str) -- end date of analysis time period as a string
+            timeframe (str) -- timeframe
             exchange (ccxt class) -- ccxt exchange to retrieve data from. Default is binance
             starting_cash (float) -- starting broker cash
         """
@@ -65,11 +66,12 @@ class backtrader_set():
         self.strategy = strategy
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
+        self.timeframe_str = timeframe_str
 
-        if exchange:
-            self.exchange = exchange
+        if datapuller:
+            self.data_puller = datapuller
         else:
-            self.exchange = gcd.getBinanceExchange()
+            self.data_puller = gcd.DataPuller.kraken_puller()
         
         self.starting_cash = starting_cash
 
@@ -80,7 +82,9 @@ class backtrader_set():
         
     def run(self):
         """runs strategy over all symbols"""
-        ohlcv_df_list = gcd.get_DataFrame(self.symbol_list, self.exchange, self.start_date_str, self.end_date_str, ret_as_list=True, timeframe='1d')
+        ohlcv_df_list = []
+        for symbol in self.symbol_list:
+            ohlcv_df_list.append(self.data_puller.fetch_df(symbol, self.timeframe_str, self.start_date_str, self.end_date_str))
         for index in range(len(self.symbol_list)):
             cerebro = bt.Cerebro()
             data = bt.feeds.PandasData(dataname=ohlcv_df_list[index], nocase=True)
@@ -263,5 +267,5 @@ def get_candlestick_plot(data):
             close=data['Close'])
 
 if __name__ == '__main__':
-    myset = backtrader_set(['ETH/BTC'], MaCrossStrategy, bt.sizers.PercentSizer, 10, '1/1/18', '1/1/20')
+    myset = backtrader_set(['ETH/USD'], MaCrossStrategy, bt.sizers.PercentSizer, 10, '1/1/18', '1/1/20')
     myset.run()

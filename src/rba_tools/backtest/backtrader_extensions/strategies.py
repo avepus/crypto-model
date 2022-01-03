@@ -25,7 +25,7 @@ class ConsecutiveBarsTest(bt.Strategy):
         #self.consec0 = rbsind.ConsecutiveBars(self.data0)
         consec1 = rbsind.ConsecutiveBars(self.data1)
 
-        self.buy_signal = consec1.consecutive_bars() > 5
+        self.buy_signal = consec1.consecutive_bars() > 4
 
     def next(self):
         if not self.position:
