@@ -17,12 +17,51 @@ class StopLimitEntryStrategy(bt.Strategy):
 class TrailingStopStrategy(bt.Strategy):
     pass
 
+
+class MaCrossStrategy(bt.Strategy):
+
+    def __init__(self):
+        ma_fast = bt.ind.SMA(period = 10)
+        ma_slow = bt.ind.SMA(period = 50)
+
+        self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
+
+    def next(self):
+        if not self.position:
+            if self.crossover > 0:
+                self.buy()
+        elif self.crossover < 0:
+            self.close()
+
+
 class ConsecutiveBarsTest(bt.Strategy):
 
     def __init__(self):
         # self.sma0 = bt.ind.SMA(self.data0, period=10)
         # self.sma1 = bt.ind.SMA(self.data1, period=10)
         #self.consec0 = rbsind.ConsecutiveBars(self.data0)
+
+        consec1 = rbsind.ConsecutiveBars(self.data)
+
+        self.buy_signal = consec1.consecutive_bars() > 4
+
+    def next(self):
+        if not self.position:
+            if self.buy_signal:
+                o1 = self.buy()
+        else:
+            #if there is no trend then close
+            if not self.buy_signal:
+                self.close()
+
+
+class ConsecutiveBarsTesttSecondData(bt.Strategy):
+
+    def __init__(self):
+        # self.sma0 = bt.ind.SMA(self.data0, period=10)
+        # self.sma1 = bt.ind.SMA(self.data1, period=10)
+        #self.consec0 = rbsind.ConsecutiveBars(self.data0)
+
         consec1 = rbsind.ConsecutiveBars(self.data1)
 
         self.buy_signal = consec1.consecutive_bars() > 4
