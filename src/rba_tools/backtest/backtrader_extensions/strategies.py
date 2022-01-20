@@ -17,6 +17,66 @@ class StopLimitEntryStrategy(bt.Strategy):
 class TrailingStopStrategy(bt.Strategy):
     pass
 
+
+class MaCrossStrategy(bt.Strategy):
+
+    def __init__(self):
+        ma_fast = bt.ind.SMA(period = 10)
+        ma_slow = bt.ind.SMA(period = 50)
+
+        self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
+
+    def next(self):
+        if not self.position:
+            if self.crossover > 0:
+                self.buy()
+        elif self.crossover < 0:
+            self.close()
+
+
+class ConsecutiveBarsTest(bt.Strategy):
+
+    def __init__(self):
+        # self.sma0 = bt.ind.SMA(self.data0, period=10)
+        # self.sma1 = bt.ind.SMA(self.data1, period=10)
+        #self.consec0 = rbsind.ConsecutiveBars(self.data0)
+
+        consec1 = rbsind.ConsecutiveBars(self.data)
+
+        self.buy_signal = consec1.consecutive_bars() > 4
+
+    def next(self):
+        if not self.position:
+            if self.buy_signal:
+                o1 = self.buy()
+        else:
+            #if there is no trend then close
+            if not self.buy_signal:
+                self.close()
+
+
+class ConsecutiveBarsTesttSecondData(bt.Strategy):
+
+    def __init__(self):
+        # self.sma0 = bt.ind.SMA(self.data0, period=10)
+        # self.sma1 = bt.ind.SMA(self.data1, period=10)
+        #self.consec0 = rbsind.ConsecutiveBars(self.data0)
+
+        consec1 = rbsind.ConsecutiveBars(self.data1)
+
+        self.buy_signal = consec1.consecutive_bars() > 4
+
+    def next(self):
+        if not self.position:
+            if self.buy_signal:
+                o1 = self.buy()
+        else:
+            #if there is no trend then close
+            if not self.buy_signal:
+                self.close()
+
+        
+
 class TestStrategy(bt.Strategy):
 
     params = (
@@ -27,14 +87,19 @@ class TestStrategy(bt.Strategy):
         )
 
     def __init__(self):
-        ma = bt.ind.SMA(period = 10)
+        # ma = bt.ind.SMA(period = 10)
         #self.maslope = rbsind.Slope(ma)
         #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
         #self.con_bars = rbsind.TrendInfo(self.data)
-        self.in_trend = rbsind.InTrend(self.data)
-        self.retrace_percent = rbsind.Retrace_Percent(self.data)
-        self.trend_high = rbsind.Trend_High(self.data)
-        self.trend_open = rbsind.Trend_Open(self.data)
+        self.in_trend = in_trend = rbsind.InTrend(self.data1)
+        self.retrace_percent = rbsind.Retrace_Percent(self.data1)
+        self.trend_high = rbsind.Trend_High(self.data1)
+        self.trend_open = rbsind.Trend_Open(self.data1)
+
+        in_trend1 = in_trend()
+        self.buy_signal = in_trend1.trend_retrace < 50
+        self.sell_signal = isnan(in_trend1.trend_retrace)
+
         if self.params.debug:
             open('run_log.txt', 'w').close() #clear out file at during init if we're writing to file
 
@@ -107,7 +172,7 @@ class TestStrategy(bt.Strategy):
             self.debug_print()
         # Check if we are in the market
         if not self.position:
-            if self.in_trend.trend_retrace[0] < 50:
+            if self.buy_signal:
                 o1 = self.buy()
                 #self.log('o1=' + str(o1))
                 o2 = self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
@@ -117,5 +182,5 @@ class TestStrategy(bt.Strategy):
                 #self.log('o3=' + str(o3))
         else:
             #if there is no trend then close
-            if isnan(self.in_trend.trend_retrace[0]):
+            if self.sell_signal:
                 self.close()

@@ -38,6 +38,7 @@ class LowHighRatio(bt.Indicator):
         self.threshold = bt.Max(self.p.threshold, self.p.threshold)
         self.lines.low_high_ratio = bt.indicators.Lowest(self.data.low, period=self.p.period) / bt.indicators.Highest(self.data.high, period=self.p.period) * 100
 
+
 class ConsecutiveBars(bt.Indicator):
     """
     This indicator counts the number of consecutive bars green/red bars
@@ -94,8 +95,11 @@ class InTrend(bt.Indicator):
         self.lines.consec_bars = ConsecutiveBars(self.data)
 
     def next(self):
-        consecutive_bar_start = int(-1 * self.lines.consec_bars[-1])
+        consecutive_bar_start = int(-1 * abs(self.lines.consec_bars[-1]))
 
+        if consecutive_bar_start > len(self.data.open) - 1:
+            return
+        
         if self.lines.consec_bars[0] == -1:
             #we just turned down, need to check if this is a new trend
             over_min_bars = self.lines.consec_bars[-1] > self.p.minimum_bars

@@ -1,14 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Type
-import ccxt
 import pandas as pd
 import numpy as np
 from time import sleep
 from datetime import datetime, date, timedelta
 from dateutil import tz
+from pathlib import Path
+from zipfile import ZipFile
+import ccxt
 from rba_tools.retriever.timeframe import Timeframe
 import rba_tools.retriever.database_interface as dbi
 import rba_tools.retriever.constants as constants
+from rba_tools.exceptions import KrakenFileNotFoundError
 
 class OHLCVDataRetriever(ABC):
     "pulls OHLCV data for a specific symbol, timeframe, and date range"
@@ -47,7 +50,6 @@ class CCXTDataRetriever(OHLCVDataRetriever):
         df = pd.DataFrame(data, columns=header).set_index(constants.INDEX_HEADER)
         df.index = pd.to_datetime(df.index, unit='ms')
         df['Symbol'] = symbol
-        df['Is_Final_Row'] = np.nan
         return df.loc[:to_date].copy()
 
     def get_all_ccxt_data(self, symbol: str, timeframe: Timeframe, from_date_ms: int, to_date_ms: int):
@@ -73,7 +75,7 @@ class CCXTDataRetriever(OHLCVDataRetriever):
         return return_data
 
     def _ccxt_timeframe_format(self, timeframe: Timeframe):
-        return timeframe.get_timeframe_name().lower()
+        return str(timeframe).lower()
 
     def _convert_datetime_to_UTC_Ms(self,input_datetime=None):
         return int(round(input_datetime.replace(tzinfo = tz.tzutc()).timestamp() * 1000))
@@ -106,7 +108,6 @@ class DatabaseRetriever(OHLCVDataRetriever):
     def format_database_data(self, data: pd.DataFrame):
         if data.empty:
             return data
-        data['Is_Final_Row'] = pd.to_numeric(data['Is_Final_Row'], errors='coerce')
         return data
 
     def get_query(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime):
@@ -120,3 +121,42 @@ class DatabaseRetriever(OHLCVDataRetriever):
             WHERE {symbol_condition}
             {start_condition}
             {end_condition}"""
+
+class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
+    """pulls data from a Kraken OHLCVT Zip file downloaded from thier webiste"""
+    
+    def __init__(self, kraken_file: str=None):
+        """defualt expectation is that file is in ohlcv_data directory and is named 'Kraken_OHLCVT.zip'
+        but file location may be overridden"""
+        self.kraken_file = kraken_file
+        if not self.kraken_file:
+            self.kraken_file = str(Path(__file__).parent) + r'\ohlcv_data\Kraken_OHLCVT.zip'
+        if not Path(self.kraken_file).is_file():
+            raise KrakenFileNotFoundError
+        
+
+    def fetch_ohlcv(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime) -> pd.DataFrame:
+        from_datetime, to_datetime = self.get_from_and_to_datetimes(from_date, to_date)
+        krakenk_zip_file = ZipFile(self.kraken_file)
+        kraken_headers = [constants.INDEX_HEADER]
+        kraken_headers.extend(constants.DATAFRAME_HEADERS)
+        kraken_csv_file = self._get_kraken_csv_file(symbol, timeframe)
+        result = pd.read_csv(krakenk_zip_file.open(kraken_csv_file), index_col=0, names=kraken_headers)
+        return self.format_kraken_data(result, symbol, from_datetime, to_datetime)
+
+    def format_kraken_data(self, data: pd.DataFrame, symbol: str, from_date: datetime, to_date: datetime):
+        data.index = pd.to_datetime(data.index, unit='s')
+        data['Symbol'] = symbol
+        return data.loc[from_date:to_date]
+
+    def _get_kraken_csv_file(self, symbol: str, timeframe: Timeframe):
+        """get kraken csv file name"""
+        kraken_symbol = symbol.replace('/','')
+        minutes = int(timeframe.get_timeframe_seconds() / 60)
+        return kraken_symbol + '_' + str(minutes) + '.csv'
+
+
+
+
+if __name__ == '__main__':
+    print(str(Path(__file__).parent) + r'\ohlcv_data\Kraken_OHLCVT.zip')

@@ -24,11 +24,17 @@ class DataPuller:
         self.database = database
 
     @classmethod
-    def use_defaults(cls):
-        database = dbi.SQLite3OHLCVDatabase()
-        stored_retriever = retrievers.DatabaseRetriever(database)
-        online_retriever = retrievers.CCXTDataRetriever('binance')
-        return cls(stored_retriever, online_retriever, database)
+    def binance_and_sqlite_puller(cls):
+        sqlite_db = dbi.SQLite3OHLCVDatabase()
+        sqlite_retreiver = retrievers.DatabaseRetriever(sqlite_db)
+        return cls(stored_retriever=sqlite_retreiver,
+                   online_retriever = retrievers.CCXTDataRetriever('binance'),
+                   database=sqlite_db
+                   )
+    
+    @classmethod
+    def kraken_puller(cls):
+        return cls(stored_retriever=retrievers.KrakenOHLCVTZipRetriever())
 
     def fetch_df(self, symbol: str, timeframe_str: str, from_date_str: str, to_date_str: str=None):
         """grabs a pandas dataframe from the stored database if possible and from online otherwise"""

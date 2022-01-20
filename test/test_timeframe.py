@@ -70,33 +70,33 @@ class TestTimeframe(unittest.TestCase):
         self.assertEqual(expected, result)
 
 
-    def test_get_timeframe_name_from_str(self):
+    def test__str__(self):
         """test function that gets the name of the timeframe as a string"""
-        result = Timeframe.from_string('60s').get_timeframe_name()
+        result = str(Timeframe.from_string('60s'))
         expected = '1M'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('m').get_timeframe_name()
+        result = str(Timeframe.from_string('m'))
         expected = '1M'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('300s').get_timeframe_name()
+        result = str(Timeframe.from_string('300s'))
         expected = '5M'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('60m').get_timeframe_name()
+        result = str(Timeframe.from_string('60m'))
         expected = '1H'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('4h').get_timeframe_name()
+        result = str(Timeframe.from_string('4h'))
         expected = '4H'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('24h').get_timeframe_name()
+        result = str(Timeframe.from_string('24h'))
         expected = '1D'
         self.assertEqual(result, expected)
 
-        result = Timeframe.from_string('7d').get_timeframe_name()
+        result = str(Timeframe.from_string('7d'))
         expected = '7D'
         self.assertEqual(result, expected)
 

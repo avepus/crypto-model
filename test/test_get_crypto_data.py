@@ -34,7 +34,7 @@ class TestMain(unittest.TestCase):
             os.remove(self.sqlite_database.get_database_file())
 
         self.sqlite_retriever = retrievers.DatabaseRetriever(self.sqlite_database)
-        self.ccxt_retriever = retrievers.CCXTDataRetriever('binance')
+        self.ccxt_retriever = retrievers.CCXTDataRetriever('kraken')
         self.file_path_1h = str(Path(__file__).parent) + r'\ETH_BTC_1H_2020-12-1_to_2020-12-20.csv'
         self.csv_retriver_1h = retrievers.CSVDataRetriever(self.file_path_1h)
         self.file_path_1d = str(Path(__file__).parent) + r'\ETH_BTC_1D_2020-12-1_to_2020-12-20.csv'

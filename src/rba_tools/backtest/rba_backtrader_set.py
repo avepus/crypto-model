@@ -16,7 +16,7 @@ Created on Sun Feb 21 18:05:42 2021
 
 import backtrader as bt
 from backtrader.utils import num2date
-import rba_tools as rba
+import rba_tools.backtest.backtrader_extensions.strategies as rba_strategies
 import rba_tools.retriever.get_crypto_data as gcd
 import dash_html_components as html
 import dash_core_components as dcc
@@ -42,21 +42,22 @@ class MaCrossStrategy(bt.Strategy):
             self.close()
 
 
-class backtrader_set():
+class BacktraderSet():
 
-    def __init__(self, symbols, strategy, sizer, sizer_param, start_date_str, end_date_str, exchange=None, starting_cash=1000.0):
+    def __init__(self, symbols, strategy, start_date_str, end_date_str, timeframe_str='1d', datapuller=None, starting_cash=1000.0, sizer=None, sizer_param=None):
         """
         Creates a backtrader_set instance for retriving, running analysis, and displaying results
         
         Parameters:
             symbols (list or str) -- symbols to run over
             strategy (backtrader.analyzers.Analyzer) -- backtrader strategy to run on the data
-            sizer (bt.sizers.*) -- backtrader sizer to define size of trades
-            sizer_param (any) -- parameter for sizer
             start_date_str (str) -- start date of analysis time period as a string
             end_date_str (str) -- end date of analysis time period as a string
+            timeframe (str) -- timeframe
             exchange (ccxt class) -- ccxt exchange to retrieve data from. Default is binance
             starting_cash (float) -- starting broker cash
+            sizer (bt.sizers.*) -- backtrader sizer to define size of trades. NOT YET IMPLEMENTED
+            sizer_param (any) -- parameter for sizer. NOT YET IMPLEMENTED
         """
         if type(symbols) == str:
             symbols = [symbols]
@@ -65,24 +66,34 @@ class backtrader_set():
         self.strategy = strategy
         self.start_date_str = start_date_str
         self.end_date_str = end_date_str
+        self.timeframe_str = timeframe_str
 
-        if exchange:
-            self.exchange = exchange
+        if datapuller:
+            self.data_puller = datapuller
         else:
-            self.exchange = gcd.getBinanceExchange()
+            self.data_puller = gcd.DataPuller.kraken_puller()
         
         self.starting_cash = starting_cash
 
         self.cerebro_list = []
         self.cerebro_run_return_list = []
         self.current_symbol_index = 0
+
+        self.sizer = sizer
+        self.sizer_param = sizer_param
+
+        self.run()
         
         
     def run(self):
         """runs strategy over all symbols"""
-        ohlcv_df_list = gcd.get_DataFrame(self.symbol_list, self.exchange, self.start_date_str, self.end_date_str, ret_as_list=True, timeframe='1d')
+        ohlcv_df_list = []
+        for symbol in self.symbol_list:
+            ohlcv_df_list.append(self.data_puller.fetch_df(symbol, self.timeframe_str, self.start_date_str, self.end_date_str))
         for index in range(len(self.symbol_list)):
             cerebro = bt.Cerebro()
+            if self.sizer:
+                cerebro.addsizer(self.sizer, self.sizer_param)
             data = bt.feeds.PandasData(dataname=ohlcv_df_list[index], nocase=True)
             cerebro.adddata(data)
             cerebro.addstrategy(self.strategy)
@@ -90,7 +101,8 @@ class backtrader_set():
             cerebro.broker.setcash(self.starting_cash)
 
             self.cerebro_list.append(cerebro)
-            self.cerebro_run_return_list.append(cerebro.run())
+            tmp = cerebro.run()
+            self.cerebro_run_return_list.append(tmp)
         self.set_current_symbol_figure()
 
     def plot_current_symbol(self):
@@ -148,12 +160,6 @@ class backtrader_set():
         index = self.get_current_datetime_array()
         return pd.Series(data=trades,index=index).dropna()
 
-
-
-
-    
-
-    
     def get_current_ohlcv_data(self):
         return get_ohlcv_data_from_cerebro_run(self.get_current_symbol_run_data())
     
@@ -167,10 +173,10 @@ class backtrader_set():
         pass
     
 
-def get_trades_from_cerebro_run(cerebro_run):
+def get_trades_from_cerebro_run(cerebro_run, index=0):
     #get trades. Arrays of this oberserver are double length for some reason
     array_list = []
-    for strat in cerebro_run[0].stats:
+    for strat in cerebro_run[index].stats:
         if isinstance(strat, bt.observers.trades.Trades):
             for line in strat.lines:
                 pnl_data = np.frombuffer(line.array)
@@ -263,5 +269,7 @@ def get_candlestick_plot(data):
             close=data['Close'])
 
 if __name__ == '__main__':
-    myset = backtrader_set(['ETH/BTC'], MaCrossStrategy, bt.sizers.PercentSizer, 10, '1/1/18', '1/1/20')
+    kraken_puller = gcd.DataPuller.kraken_puller()
+    myset = BacktraderSet(['ETH/USD'], rba_strategies.MaCrossStrategy, '1/1/18', '1/1/20', '1d', kraken_puller) #, 1000, bt.sizers.PercentSizer, 10)
     myset.run()
+    

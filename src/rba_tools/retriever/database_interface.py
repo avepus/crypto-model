@@ -50,9 +50,7 @@ class SQLite3OHLCVDatabase(OHLCVDatabaseInterface):
                                         Close real NOT NULL,
                                         Volume integer NOT NULL,
                                         Symbol string NOT NULL,
-                                        Is_Final_Row integer,
                                         PRIMARY KEY (Symbol, Timestamp)
-                                        CHECK(Is_Final_Row == 0 or Is_Final_Row == 1 or Is_Final_Row is NULL)
                                     ); """
         connection = sqlite3.connect(self.get_database_file())
         try:
