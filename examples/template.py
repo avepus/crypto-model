@@ -14,7 +14,7 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
     cerebro = bt.Cerebro(runonce=False)
 
     # Add a strategy
-    cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
+    #cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
     #cerebro.addstrategy(rbsstrat.ConsecutiveBarsTest)
     #cerebro.addstrategy(rbsstrat.StopLimitEntryStrategy)
 
@@ -36,7 +36,7 @@ def runstrat(plot=True): #Need stop loss, need to ensure proper behavior with se
     #cerebro.adddata(data)
     cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=240)
 
-    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1440)
+    #cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1440)
 
     # Run over everything
     cerebro.run()

@@ -43,6 +43,7 @@ class MaCrossStrategy(bt.Strategy):
 
 
 class BacktraderSet():
+    """run's a strategy and a list of symbols and stores the results of the run"""
 
     def __init__(self, symbols, strategy, start_date_str, end_date_str, timeframe_str='1d', datapuller=None, starting_cash=1000.0, sizer=None, sizer_param=None):
         """
