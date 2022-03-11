@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Type
+import os
 import pandas as pd
 import numpy as np
 from time import sleep
@@ -130,7 +131,7 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
         but file location may be overridden"""
         self.kraken_file = kraken_file
         if not self.kraken_file:
-            self.kraken_file = str(Path(__file__).parent) + r'\ohlcv_data\Kraken_OHLCVT.zip'
+            self.kraken_file = os.path.join(str(Path(__file__).parent), 'ohlcv_data', 'Kraken_OHLCVT.zip')
         if not Path(self.kraken_file).is_file():
             raise KrakenFileNotFoundError
         
@@ -159,4 +160,4 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
 
 
 if __name__ == '__main__':
-    print(str(Path(__file__).parent) + r'\ohlcv_data\Kraken_OHLCVT.zip')
+    print(os.path.join(str(Path(__file__).parent), 'ohlcv_data', 'Kraken_OHLCVT.zip'))
