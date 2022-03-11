@@ -113,26 +113,35 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
         return figs
 
 def testplotind(indicator: bt.indicator, x_axis):
-    for lineidx in range(indicator.size()):
-            line = indicator.lines[lineidx]
-            linealias = indicator.lines._getlinealias(lineidx)
+    for line_index in range(indicator.size()):
+            line = indicator.lines[line_index]
 
-            lineplotinfo = getattr(indicator.plotlines, '_%d' % lineidx, None)
-            if not lineplotinfo:
-                lineplotinfo = getattr(indicator.plotlines, linealias, None)
+            line_plot_info = get_line_plot_info(indicator, line_index)
 
-            if not lineplotinfo:
-                lineplotinfo = bt.AutoInfoClass()
-
-            if lineplotinfo._get('_plotskip', False):
+            if line_plot_info._get('_plotskip', False):
                 continue
-
+            
+            #gets the kwargs from the indicator that tell how it's plotted
+            line_plot_kwargs = line_plot_info._getkwargs(skip_=True)
 
             # plot data
             indicator_vals = line.plotrange(0, len(line))
 
             return go.Scatter(x=x_axis,y=np.array(indicator_vals))
 
+
+def get_line_plot_info(indicator:bt.indicator, line_index: int):
+    """get the lineplotinfo from an indicator"""
+    line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
+    if line_plot_info:
+        return line_plot_info
+    
+    linealias = indicator.lines._getlinealias(line_index)
+    line_plot_info = getattr(indicator.plotlines, linealias, None)
+    if line_plot_info:
+        return line_plot_info
+
+    return bt.AutoInfoClass()
 
 
 def plotind(self, iref, ind,
