@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import backtrader as bt
 from datetime import datetime
 import plotly.graph_objects as go
@@ -113,11 +114,13 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
 
         return figs
 
+# @dataclass
+# class Data
 
 def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False):
     """adds an indicator and all of it's lines to a dataframe"""
     ret_df = df
-    if inplace:
+    if not inplace:
         ret_df = df.copy()
 
     for line_index in range(indicator.size()):
@@ -157,6 +160,7 @@ def get_line_plot_info(indicator:bt.indicator, line_index: int):
     if line_plot_info:
         return line_plot_info
 
+    #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
     return bt.AutoInfoClass()
 
 
@@ -561,6 +565,20 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True,
             self.mpyplot.autoscale(enable=True, axis=axtight, tight=True)
 
         return figs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #code from backtrader.cerebro.plot is below
 def plot(self, plotter=None, numfigs=1, iplot=True, start=None, end=None,
