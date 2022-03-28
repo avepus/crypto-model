@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 from backtrader.utils import num2date
 import pandas as pd
 import numpy as np
-from rba_tools.backtest.rba_backtrader_set import get_ohlcv_data_from_cerebro_run
 
 def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
@@ -114,6 +113,7 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
 
         return figs
 
+<<<<<<< HEAD
 # @dataclass
 # class Data
 
@@ -131,6 +131,8 @@ def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False
         ret_df[alias] = indicator_vals
     return ret_df
 
+=======
+>>>>>>> 001b74081c9491236a2813631e6b203e8994da7c
 def testplotind(indicator: bt.indicator, x_axis):
     for line_index in range(indicator.size()):
             line = indicator.lines[line_index]
@@ -146,7 +148,7 @@ def testplotind(indicator: bt.indicator, x_axis):
             # plot data
             indicator_vals = line.plotrange(0, len(line))
 
-            return go.Scatter(x=x_axis, y=np.array(indicator_vals))
+            return go.Scatter(x=x_axis,y=np.array(indicator_vals))
 
 
 def get_line_plot_info(indicator:bt.indicator, line_index: int):

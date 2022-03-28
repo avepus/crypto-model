@@ -18,8 +18,8 @@ import backtrader as bt
 from backtrader.utils import num2date
 import rba_tools.backtest.backtrader_extensions.strategies as rba_strategies
 import rba_tools.retriever.get_crypto_data as gcd
-import dash_html_components as html
-import dash_core_components as dcc
+from dash import html
+from dash import dcc
 import pandas as pd
 import numpy as np
 import plotly.express as px
