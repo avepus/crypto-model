@@ -113,7 +113,6 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
 
         return figs
 
-<<<<<<< HEAD
 # @dataclass
 # class Data
 
@@ -131,8 +130,6 @@ def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False
         ret_df[alias] = indicator_vals
     return ret_df
 
-=======
->>>>>>> 001b74081c9491236a2813631e6b203e8994da7c
 def testplotind(indicator: bt.indicator, x_axis):
     for line_index in range(indicator.size()):
             line = indicator.lines[line_index]
