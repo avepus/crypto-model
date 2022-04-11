@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 import backtrader as bt
 from datetime import datetime
@@ -10,6 +11,69 @@ def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
     datetime_array = datetime_series.map(num2date)
     return pd.to_datetime(datetime_array)
+
+
+def rbs_sort_indicators(strategy: bt.Strategy):
+    # These lists/dictionaries hold the subplots that go above each data
+    plot_dictionary = {
+        'dplotstop' : list(),
+        'dplotsup' : defaultdict(list),
+        'dplotsdown' : defaultdict(list),
+        'dplotsover' : defaultdict(list)
+    }
+
+    # Sort observers in the different lists/dictionaries
+    for observer in strategy.getobservers():
+        if not observer.plotinfo.plot or observer.plotinfo.plotskip:
+            continue
+
+        if observer.plotinfo.subplot:
+            plot_dictionary['dplotstop'].append(observer)
+        else:
+            key = getattr(observer._clock, 'owner', observer._clock)
+            plot_dictionary['dplotsover'][key].append(observer)
+
+    # Sort indicators in the different lists/dictionaries
+    for indicator in strategy.getindicators():
+        if not hasattr(indicator, 'plotinfo'):
+            # no plotting support - so far LineSingle derived classes
+            continue
+
+        if not indicator.plotinfo.plot or indicator.plotinfo.plotskip:
+            continue
+
+        indicator._plotinit()  # will be plotted ... call its init function
+
+        # support LineSeriesStub which has "owner" to point to the data
+        key = getattr(indicator._clock, 'owner', indicator._clock)
+        if key is strategy:  # a LinesCoupler
+            key = strategy.data
+
+        if getattr(indicator.plotinfo, 'plotforce', False):
+            if key not in strategy.datas:
+                datas = strategy.datas
+                while True:
+                    if key not in strategy.datas:
+                        key = key._clock
+                    else:
+                        break
+
+        xpmaster = indicator.plotinfo.plotmaster
+        if xpmaster is indicator:
+            xpmaster = None
+        if xpmaster is not None:
+            key = xpmaster
+
+        if indicator.plotinfo.subplot and xpmaster is None:
+            if indicator.plotinfo.plotabove:
+                plot_dictionary['dplotsup'][key].append(indicator)
+            else:
+                plot_dictionary['dplotsdown'][key].append(indicator)
+        else:
+            plot_dictionary['dplotsover'][key].append(indicator)
+
+    return plot_dictionary
+
 
 
 #my attempt
@@ -928,11 +992,6 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True,
                 self.pinf.pstart, self.pinf.psize)
             self.pinf.xlen = len(self.pinf.xreal)
             self.pinf.x = list(range(self.pinf.xlen))
-            # self.pinf.pfillers = {None: []}
-            # for key, val in pfillers.items():
-            #     pfstart = bisect.bisect_left(val, self.pinf.pstart)
-            #     pfend = bisect.bisect_right(val, self.pinf.pend)
-            #     self.pinf.pfillers[key] = val[pfstart:pfend]
 
             # Do the plotting
             # Things that go always at the top (observers)
@@ -1018,6 +1077,64 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True,
 
             # Things must be tight along the x axis (to fill both ends)
             axtight = 'x' if not self.pinf.sch.ytight else 'both'
-            self.mpyplot.autoscale(enable=True, axis=axtight, tight=True)
+            self.mpyplot.autoscale(
+                enable=True, axis=axtight, tight=True)
 
         return figs
+
+    # def sortdataindicators(self, strategy):
+    #     # These lists/dictionaries hold the subplots that go above each data
+    #     self.dplotstop = list()
+    #     self.dplotsup = collections.defaultdict(list)
+    #     self.dplotsdown = collections.defaultdict(list)
+    #     self.dplotsover = collections.defaultdict(list)
+
+    #     # Sort observers in the different lists/dictionaries
+    #     for x in strategy.getobservers():
+    #         if not x.plotinfo.plot or x.plotinfo.plotskip:
+    #             continue
+
+    #         if x.plotinfo.subplot:
+    #             self.dplotstop.append(x)
+    #         else:
+    #             key = getattr(x._clock, 'owner', x._clock)
+    #             self.dplotsover[key].append(x)
+
+    #     # Sort indicators in the different lists/dictionaries
+    #     for x in strategy.getindicators():
+    #         if not hasattr(x, 'plotinfo'):
+    #             # no plotting support - so far LineSingle derived classes
+    #             continue
+
+    #         if not x.plotinfo.plot or x.plotinfo.plotskip:
+    #             continue
+
+    #         x._plotinit()  # will be plotted ... call its init function
+
+    #         # support LineSeriesStub which has "owner" to point to the data
+    #         key = getattr(x._clock, 'owner', x._clock)
+    #         if key is strategy:  # a LinesCoupler
+    #             key = strategy.data
+
+    #         if getattr(x.plotinfo, 'plotforce', False):
+    #             if key not in strategy.datas:
+    #                 datas = strategy.datas
+    #                 while True:
+    #                     if key not in strategy.datas:
+    #                         key = key._clock
+    #                     else:
+    #                         break
+
+    #         xpmaster = x.plotinfo.plotmaster
+    #         if xpmaster is x:
+    #             xpmaster = None
+    #         if xpmaster is not None:
+    #             key = xpmaster
+
+    #         if x.plotinfo.subplot and xpmaster is None:
+    #             if x.plotinfo.plotabove:
+    #                 self.dplotsup[key].append(x)
+    #             else:
+    #                 self.dplotsdown[key].append(x)
+    #         else:
+    #             self.dplotsover[key].append(x)
