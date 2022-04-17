@@ -10,6 +10,7 @@ Created on Tues Mar 30 2021
 import backtrader as bt
 from numpy import isnan
 
+
 class Slope(bt.Indicator):
     '''
     This indicator gives the slope of the input line.

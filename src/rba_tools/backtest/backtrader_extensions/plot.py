@@ -188,28 +188,66 @@ def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False
 
     for line_index in range(indicator.size()):
         line = indicator.lines[line_index]
-        alias = indicator.lines._getlinealias(line_index)
+        name = get_indicator_line_name(indicator, line_index)
         indicator_vals = line.plotrange(0, len(line))
 
-        ret_df[alias] = indicator_vals
+        ret_df[name] = indicator_vals
     return ret_df
 
-def testplotind(indicator: bt.indicator, x_axis):
+def get_indicator_params_string(indicator: bt.indicator):
+    """gets formatted paramaters from an indicator. They will be formatted as like so
+    "param1name=value param2name=value ..."
+    """
+    params_str = ''
+    param_dictionary = vars(indicator.p)
+    if not param_dictionary:
+        return params_str
+    
+    for key, value in param_dictionary.items():
+        params_str += f' {key}={value}'
+    
+    return params_str.strip()
+
+
+def get_indicator_line_name(indicator: bt.indicator, index=0):
+    alias = indicator.lines._getlinealias(index)
+    return alias + ' (' + get_indicator_params_string(indicator) + ')'
+
+
+def testplotind(indicator: bt.indicator, x_axis, same_graph_inds=None, upinds=None, downinds=None):
+    """returns a list of ploytly graph objects"""
+
+    plotlist = []
+
+    # check subind
+    same_graph_inds = same_graph_inds or []
+    upinds = upinds or []
+    downinds = downinds or []
+
+    for indicator in upinds:
+        plotlist.append(testplotind(indicator, x_axis))
+
+
     for line_index in range(indicator.size()):
-            line = indicator.lines[line_index]
+        line = indicator.lines[line_index]
 
-            line_plot_info = get_line_plot_info(indicator, line_index)
+        line_plot_info = get_line_plot_info(indicator, line_index)
 
-            if line_plot_info._get('_plotskip', False):
-                continue
-            
-            #gets the kwargs from the indicator that tell how it's plotted
-            line_plot_kwargs = line_plot_info._getkwargs(skip_=True)
+        if line_plot_info._get('_plotskip', False):
+            continue
+        
+        #gets the kwargs from the indicator that tell how it's plotted
+        line_plot_kwargs = line_plot_info._getkwargs(skip_=True)
 
-            # plot data
-            indicator_vals = line.plotrange(0, len(line))
+        # plot data
+        indicator_vals = line.plotrange(0, len(line))
 
-            return go.Scatter(x=x_axis,y=np.array(indicator_vals))
+        plotlist.append(go.Scatter(x=x_axis,y=np.array(indicator_vals)))
+    
+    for indicator in downinds:
+        plotlist.append(testplotind(indicator, x_axis))
+
+    return plotlist
 
 
 def get_line_plot_info(indicator:bt.indicator, line_index: int):
