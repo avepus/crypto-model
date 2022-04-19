@@ -75,12 +75,30 @@ def rbs_sort_indicators(strategy: bt.Strategy):
     return plot_dictionary
 
 
+def get_ohlcv_data_from_data(data):
+    #get ohlcv dataframe from a backtrader feed
+    start = 0
+    end = len(data)
+    datetime_float_ary = data.datetime.plot()
+    datetime_list = [num2date(float_date) for float_date in datetime_float_ary]
+    index = np.array(datetime_list)
+    return pd.DataFrame(data={
+        'Open' : data.open.plotrange(start,end),
+        'High' : data.high.plotrange(start,end),
+        'Low' : data.low.plotrange(start,end),
+        'Close' : data.close.plotrange(start,end),
+        'Volume' : data.volume.plotrange(start,end)
+        },
+        index=index)
 
 #my attempt
-def my_plot(self, strategy, plotter=None, start=None, end=None, **kwargs):
-    if self._exactbars > 0:
-        return
+def my_plot(strategy, plotter=None, start=None, end=None, **kwargs):
+    #if self._exactbars > 0:
+    #    return
 
+    sorted_inds = rbs_sort_indicators(strategy)
+    for data in strategy.datas:
+        df = get_ohlcv_data_from_data(data)
     #do the plotting
 
 
