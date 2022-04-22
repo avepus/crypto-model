@@ -7,6 +7,13 @@ from backtrader.utils import num2date
 import pandas as pd
 import numpy as np
 
+from rba_tools.retriever.get_crypto_data import DataPuller
+
+GLOBAL_TOP = 'global_top'
+UPPER = 'upper'
+LOWER = 'lower'
+OVERLAY = 'overlay'
+
 def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
     datetime_array = datetime_series.map(num2date)
@@ -16,10 +23,10 @@ def get_datetime(strategy):
 def rbs_sort_indicators(strategy: bt.Strategy):
     # These lists/dictionaries hold the subplots that go above each data
     plot_dictionary = {
-        'dplotstop' : list(),
-        'dplotsup' : defaultdict(list),
-        'dplotsdown' : defaultdict(list),
-        'dplotsover' : defaultdict(list)
+        GLOBAL_TOP : list(),
+        UPPER : defaultdict(list),
+        LOWER : defaultdict(list),
+        OVERLAY : defaultdict(list)
     }
 
     # Sort observers in the different lists/dictionaries
@@ -28,10 +35,10 @@ def rbs_sort_indicators(strategy: bt.Strategy):
             continue
 
         if observer.plotinfo.subplot:
-            plot_dictionary['dplotstop'].append(observer)
+            plot_dictionary[GLOBAL_TOP].append(observer)
         else:
             key = getattr(observer._clock, 'owner', observer._clock)
-            plot_dictionary['dplotsover'][key].append(observer)
+            plot_dictionary[OVERLAY][key].append(observer)
 
     # Sort indicators in the different lists/dictionaries
     for indicator in strategy.getindicators():
@@ -66,11 +73,11 @@ def rbs_sort_indicators(strategy: bt.Strategy):
 
         if indicator.plotinfo.subplot and xpmaster is None:
             if indicator.plotinfo.plotabove:
-                plot_dictionary['dplotsup'][key].append(indicator)
+                plot_dictionary[UPPER][key].append(indicator)
             else:
-                plot_dictionary['dplotsdown'][key].append(indicator)
+                plot_dictionary[LOWER][key].append(indicator)
         else:
-            plot_dictionary['dplotsover'][key].append(indicator)
+            plot_dictionary[OVERLAY][key].append(indicator)
 
     return plot_dictionary
 
@@ -96,10 +103,117 @@ def my_plot(strategy, plotter=None, start=None, end=None, **kwargs):
     #if self._exactbars > 0:
     #    return
 
-    sorted_inds = rbs_sort_indicators(strategy)
-    for data in strategy.datas:
-        df = get_ohlcv_data_from_data(data)
+    df_list = list()
+
+    sorted_indicators = rbs_sort_indicators(strategy)
+
+    for index in range(len(strategy.datas)):
+        df = get_ohlcv_data_from_data(strategy.datas[index])
+
+        if index == 0:
+            #add global top indicators only to the first data
+            for indicator in sorted_indicators[GLOBAL_TOP]:
+                add_indicator_to_df(df, indicator, inplace=True)
+        
+        for indicator in sorted_indicators[UPPER]:
+            add_indicator_to_df(df, indicator, inplace=True)
+
+        for indicator in sorted_indicators[LOWER]:
+            add_indicator_to_df(df, indicator, inplace=True)
+
+        df_list.append(df)
+
+    return df_list
+        
     #do the plotting
+
+
+# @dataclass
+# class Data
+
+def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False):
+    """adds an indicator and all of it's lines to a dataframe"""
+    ret_df = df
+    if not inplace:
+        ret_df = df.copy()
+
+    for line_index in range(indicator.size()):
+        line = indicator.lines[line_index]
+        name = get_indicator_line_name(indicator, line_index)
+        indicator_vals = line.plotrange(0, len(line))
+
+        ret_df[name] = indicator_vals
+    return ret_df
+
+def get_indicator_params_string(indicator: bt.indicator):
+    """gets formatted paramaters from an indicator. They will be formatted as like so
+    "param1name=value param2name=value ..."
+    """
+    params_str = ''
+    param_dictionary = vars(indicator.p)
+    if not param_dictionary:
+        return params_str
+    
+    for key, value in param_dictionary.items():
+        params_str += f' {key}={value}'
+    
+    return params_str.strip()
+
+
+def get_indicator_line_name(indicator: bt.indicator, index=0):
+    alias = indicator.lines._getlinealias(index)
+    return alias + ' (' + get_indicator_params_string(indicator) + ')'
+
+
+def testplotind(indicator: bt.indicator, x_axis, same_graph_inds=None, upinds=None, downinds=None):
+    """returns a list of ploytly graph objects"""
+
+    plotlist = []
+
+    # check subind
+    same_graph_inds = same_graph_inds or []
+    upinds = upinds or []
+    downinds = downinds or []
+
+    for indicator in upinds:
+        plotlist.append(testplotind(indicator, x_axis))
+
+
+    for line_index in range(indicator.size()):
+        line = indicator.lines[line_index]
+
+        line_plot_info = get_line_plot_info(indicator, line_index)
+
+        if line_plot_info._get('_plotskip', False):
+            continue
+        
+        #gets the kwargs from the indicator that tell how it's plotted
+        line_plot_kwargs = line_plot_info._getkwargs(skip_=True)
+
+        # plot data
+        indicator_vals = line.plotrange(0, len(line))
+
+        plotlist.append(go.Scatter(x=x_axis,y=np.array(indicator_vals)))
+    
+    for indicator in downinds:
+        plotlist.append(testplotind(indicator, x_axis))
+
+    return plotlist
+
+
+def get_line_plot_info(indicator:bt.indicator, line_index: int):
+    """get the lineplotinfo from an indicator"""
+    line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
+    if line_plot_info:
+        return line_plot_info
+    
+    linealias = indicator.lines._getlinealias(line_index)
+    line_plot_info = getattr(indicator.plotlines, linealias, None)
+    if line_plot_info:
+        return line_plot_info
+
+    #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
+    return bt.AutoInfoClass()
 
 
 def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
@@ -194,93 +308,6 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
 
 
         return figs
-
-# @dataclass
-# class Data
-
-def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False):
-    """adds an indicator and all of it's lines to a dataframe"""
-    ret_df = df
-    if not inplace:
-        ret_df = df.copy()
-
-    for line_index in range(indicator.size()):
-        line = indicator.lines[line_index]
-        name = get_indicator_line_name(indicator, line_index)
-        indicator_vals = line.plotrange(0, len(line))
-
-        ret_df[name] = indicator_vals
-    return ret_df
-
-def get_indicator_params_string(indicator: bt.indicator):
-    """gets formatted paramaters from an indicator. They will be formatted as like so
-    "param1name=value param2name=value ..."
-    """
-    params_str = ''
-    param_dictionary = vars(indicator.p)
-    if not param_dictionary:
-        return params_str
-    
-    for key, value in param_dictionary.items():
-        params_str += f' {key}={value}'
-    
-    return params_str.strip()
-
-
-def get_indicator_line_name(indicator: bt.indicator, index=0):
-    alias = indicator.lines._getlinealias(index)
-    return alias + ' (' + get_indicator_params_string(indicator) + ')'
-
-
-def testplotind(indicator: bt.indicator, x_axis, same_graph_inds=None, upinds=None, downinds=None):
-    """returns a list of ploytly graph objects"""
-
-    plotlist = []
-
-    # check subind
-    same_graph_inds = same_graph_inds or []
-    upinds = upinds or []
-    downinds = downinds or []
-
-    for indicator in upinds:
-        plotlist.append(testplotind(indicator, x_axis))
-
-
-    for line_index in range(indicator.size()):
-        line = indicator.lines[line_index]
-
-        line_plot_info = get_line_plot_info(indicator, line_index)
-
-        if line_plot_info._get('_plotskip', False):
-            continue
-        
-        #gets the kwargs from the indicator that tell how it's plotted
-        line_plot_kwargs = line_plot_info._getkwargs(skip_=True)
-
-        # plot data
-        indicator_vals = line.plotrange(0, len(line))
-
-        plotlist.append(go.Scatter(x=x_axis,y=np.array(indicator_vals)))
-    
-    for indicator in downinds:
-        plotlist.append(testplotind(indicator, x_axis))
-
-    return plotlist
-
-
-def get_line_plot_info(indicator:bt.indicator, line_index: int):
-    """get the lineplotinfo from an indicator"""
-    line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
-    if line_plot_info:
-        return line_plot_info
-    
-    linealias = indicator.lines._getlinealias(line_index)
-    line_plot_info = getattr(indicator.plotlines, linealias, None)
-    if line_plot_info:
-        return line_plot_info
-
-    #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
-    return bt.AutoInfoClass()
 
 
 def plotind(self, iref, ind,
@@ -686,7 +713,48 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True,
         return figs
 
 
+class MaCrossStrategy(bt.Strategy):
 
+    def __init__(self):
+        ma_fast = bt.ind.SMA(period = 10)
+        ma_slow = bt.ind.SMA(period = 50)
+
+        self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
+
+    def next(self):
+        if not self.position:
+            if self.crossover > 0:
+                self.buy()
+        elif self.crossover < 0:
+            self.close()
+
+if __name__ == '__main__':
+    cerebro = bt.Cerebro(runonce=False)
+
+    cerebro.addstrategy(MaCrossStrategy)
+    puller = DataPuller.kraken_puller()
+
+    #symbol and date range
+    symbol = 'ETH/USD'
+    from_date = '1/1/20'
+    to_date = '6/30/20'
+
+    dataframe = puller.fetch_df(symbol, 'h', from_date, to_date)
+
+    # Pass it to the backtrader datafeed and add it to the cerebro
+    data = bt.feeds.PandasData(dataname=dataframe,
+                                nocase=True,
+                                )
+    #cerebro.adddata(data)
+    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=240)
+
+    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1440)
+
+    # Run over everything
+    back = cerebro.run()
+    #myp = cerebro.plot(numfigs=1, style='bar')
+    my_plot(back[0])
+    
 
 
 
