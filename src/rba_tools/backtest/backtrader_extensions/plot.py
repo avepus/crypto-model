@@ -8,11 +8,43 @@ import pandas as pd
 import numpy as np
 
 from rba_tools.retriever.get_crypto_data import DataPuller
+from rba_tools.backtest.backtrader_extensions.strategies import MaCrossStrategy
 
 GLOBAL_TOP = 'global_top'
 UPPER = 'upper'
 LOWER = 'lower'
 OVERLAY = 'overlay'
+
+
+def main():
+    cerebro = bt.Cerebro(runonce=False)
+
+    cerebro.addstrategy(MaCrossStrategy)
+    puller = DataPuller.kraken_puller()
+
+    #symbol and date range
+    symbol = 'ETH/USD'
+    from_date = '1/1/20'
+    to_date = '6/30/20'
+
+    dataframe = puller.fetch_df(symbol, 'h', from_date, to_date)
+
+    # Pass it to the backtrader datafeed and add it to the cerebro
+    data = bt.feeds.PandasData(dataname=dataframe,
+                                nocase=True,
+                                )
+    #cerebro.adddata(data)
+    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=240)
+
+    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1440)
+
+    # Run over everything
+    back = cerebro.run()
+    myp = cerebro.plot(numfigs=1, style='bar')
+
+    #my_plot(back[0])
+
+
 
 def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
@@ -108,18 +140,22 @@ def my_plot(strategy, plotter=None, start=None, end=None, **kwargs):
     sorted_indicators = rbs_sort_indicators(strategy)
 
     for index in range(len(strategy.datas)):
-        df = get_ohlcv_data_from_data(strategy.datas[index])
+        data = strategy.datas[index]
+        df = get_ohlcv_data_from_data(data)
 
         if index == 0:
             #add global top indicators only to the first data
             for indicator in sorted_indicators[GLOBAL_TOP]:
-                add_indicator_to_df(df, indicator, inplace=True)
+                add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
         
-        for indicator in sorted_indicators[UPPER]:
-            add_indicator_to_df(df, indicator, inplace=True)
+        for indicator in sorted_indicators[UPPER][data]:
+            add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
 
-        for indicator in sorted_indicators[LOWER]:
-            add_indicator_to_df(df, indicator, inplace=True)
+        for indicator in sorted_indicators[OVERLAY][data]:
+            add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+
+        for indicator in sorted_indicators[LOWER][data]:
+            add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
 
         df_list.append(df)
 
@@ -130,6 +166,16 @@ def my_plot(strategy, plotter=None, start=None, end=None, **kwargs):
 
 # @dataclass
 # class Data
+
+def add_all_sorted_indicators_to_df(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
+    """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
+    for inner_indicator in sorted_indicators[UPPER][indicator]:
+        add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
+    
+    add_indicator_to_df(df, indicator, inplace=True)
+
+    for inner_indicator in sorted_indicators[LOWER][indicator]:
+        add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
 
 def add_indicator_to_df(df: pd.DataFrame, indicator: bt.indicator, inplace=False):
     """adds an indicator and all of it's lines to a dataframe"""
@@ -713,47 +759,8 @@ def plot(self, strategy, figid=0, numfigs=1, iplot=True,
         return figs
 
 
-class MaCrossStrategy(bt.Strategy):
-
-    def __init__(self):
-        ma_fast = bt.ind.SMA(period = 10)
-        ma_slow = bt.ind.SMA(period = 50)
-
-        self.crossover = bt.ind.CrossOver(ma_fast, ma_slow)
-
-    def next(self):
-        if not self.position:
-            if self.crossover > 0:
-                self.buy()
-        elif self.crossover < 0:
-            self.close()
-
 if __name__ == '__main__':
-    cerebro = bt.Cerebro(runonce=False)
-
-    cerebro.addstrategy(MaCrossStrategy)
-    puller = DataPuller.kraken_puller()
-
-    #symbol and date range
-    symbol = 'ETH/USD'
-    from_date = '1/1/20'
-    to_date = '6/30/20'
-
-    dataframe = puller.fetch_df(symbol, 'h', from_date, to_date)
-
-    # Pass it to the backtrader datafeed and add it to the cerebro
-    data = bt.feeds.PandasData(dataname=dataframe,
-                                nocase=True,
-                                )
-    #cerebro.adddata(data)
-    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=240)
-
-    cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=1440)
-
-    # Run over everything
-    back = cerebro.run()
-    #myp = cerebro.plot(numfigs=1, style='bar')
-    my_plot(back[0])
+    main()
     
 
 
