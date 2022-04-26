@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 from rba_tools.retriever.get_crypto_data import DataPuller
-from rba_tools.backtest.backtrader_extensions.strategies import MaCrossStrategy
+import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
 
 GLOBAL_TOP = 'global_top'
 UPPER = 'upper'
@@ -19,7 +19,10 @@ OVERLAY = 'overlay'
 def main():
     cerebro = bt.Cerebro(runonce=False)
 
-    cerebro.addstrategy(MaCrossStrategy)
+    #cerebro.addstrategy(rbsstrat.MaCrossStrategy)
+    cerebro.addstrategy(rbsstrat.TestStrategy, period=7)
+    #cerebro.addstrategy(rbsstrat.ConsecutiveBarsTest)
+    #cerebro.addstrategy(rbsstrat.StopLimitEntryStrategy)
     puller = DataPuller.kraken_puller()
 
     #symbol and date range
@@ -40,9 +43,9 @@ def main():
 
     # Run over everything
     back = cerebro.run()
-    myp = cerebro.plot(numfigs=1, style='bar')
+    #myp = cerebro.plot(numfigs=1, style='bar')
 
-    #my_plot(back[0])
+    my_plot(back[0])
 
 
 
