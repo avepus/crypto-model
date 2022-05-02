@@ -1,5 +1,6 @@
 from collections import defaultdict
-from dataclasses import dataclass
+from typing import Type
+from dataclasses import dataclass,field
 import backtrader as bt
 from datetime import datetime
 import plotly.graph_objects as go
@@ -9,6 +10,8 @@ import numpy as np
 
 from rba_tools.retriever.get_crypto_data import DataPuller
 import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
+
+
 
 GLOBAL_TOP = 'global_top'
 UPPER = 'upper'
@@ -56,6 +59,7 @@ def get_datetime(strategy):
 
 
 def rbs_sort_indicators(strategy: bt.Strategy):
+    """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
     # These lists/dictionaries hold the subplots that go above each data
     plot_dictionary = {
         GLOBAL_TOP : list(),
@@ -167,8 +171,157 @@ def my_plot(strategy, plotter=None, start=None, end=None, **kwargs):
     #do the plotting
 
 
-# @dataclass
-# class Data
+class DataAndPlotInfoContainer:
+    """Class holding the results of a cerebro run in a usable format
+
+    strategy is a BackTrader strategy object that has been run through a cerebro
+
+    dataframe_list is a list of dataframes that contain all the values from all indicators
+        and data feeds
+
+    plotinfo is a dictionary that maps the series objects in the dataframes to the plot
+        options for each line
+    """
+
+    def __init__(self, strategy: Type[bt.Strategy]):
+        self.cerebro_run = strategy
+
+        self._populate_dataframe_list_and_plotinfo(strategy)
+
+
+    def _populate_dataframe_list_and_plotinfo(self, strategy: Type[bt.Strategy]):
+        df_list = list()
+
+        sorted_indicators = self._sort_indicators(strategy)
+
+        for index in range(len(strategy.datas)):
+            data = strategy.datas[index]
+            df = get_ohlcv_data_from_data(data)
+
+            if index == 0:
+                #add global top indicators only to the first data
+                for indicator in sorted_indicators[GLOBAL_TOP]:
+                    self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+            
+            for indicator in sorted_indicators[UPPER][data]:
+                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+
+            for indicator in sorted_indicators[OVERLAY][data]:
+                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+
+            for indicator in sorted_indicators[LOWER][data]:
+                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+
+            df_list.append(df)
+
+        return df_list
+
+    def _sort_indicators(self, strategy: bt.Strategy):
+        """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
+        # These lists/dictionaries hold the subplots that go above each data
+        plot_dictionary = {
+            GLOBAL_TOP : list(),
+            UPPER : defaultdict(list),
+            LOWER : defaultdict(list),
+            OVERLAY : defaultdict(list)
+        }
+
+        # Sort observers in the different lists/dictionaries
+        for observer in strategy.getobservers():
+            if not observer.plotinfo.plot or observer.plotinfo.plotskip:
+                continue
+
+            if observer.plotinfo.subplot:
+                plot_dictionary[GLOBAL_TOP].append(observer)
+            else:
+                key = getattr(observer._clock, 'owner', observer._clock)
+                plot_dictionary[OVERLAY][key].append(observer)
+
+        # Sort indicators in the different lists/dictionaries
+        for indicator in strategy.getindicators():
+            if not hasattr(indicator, 'plotinfo'):
+                # no plotting support - so far LineSingle derived classes
+                continue
+
+            if not indicator.plotinfo.plot or indicator.plotinfo.plotskip:
+                continue
+
+            indicator._plotinit()  # will be plotted ... call its init function
+
+            # support LineSeriesStub which has "owner" to point to the data
+            key = getattr(indicator._clock, 'owner', indicator._clock)
+            if key is strategy:  # a LinesCoupler
+                key = strategy.data
+
+            if getattr(indicator.plotinfo, 'plotforce', False):
+                if key not in strategy.datas:
+                    datas = strategy.datas
+                    while True:
+                        if key not in strategy.datas:
+                            key = key._clock
+                        else:
+                            break
+
+            xpmaster = indicator.plotinfo.plotmaster
+            if xpmaster is indicator:
+                xpmaster = None
+            if xpmaster is not None:
+                key = xpmaster
+
+            if indicator.plotinfo.subplot and xpmaster is None:
+                if indicator.plotinfo.plotabove:
+                    plot_dictionary[UPPER][key].append(indicator)
+                else:
+                    plot_dictionary[LOWER][key].append(indicator)
+            else:
+                plot_dictionary[OVERLAY][key].append(indicator)
+
+        return plot_dictionary
+
+
+    def _add_all_sorted_indicators_to_df(self, df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
+        """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
+        for inner_indicator in sorted_indicators[UPPER][indicator]:
+            self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
+        
+        self._add_indicator_to_df(df, indicator, inplace=True)
+
+        for inner_indicator in sorted_indicators[LOWER][indicator]:
+            self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
+
+    def _add_indicator_to_df(self, df: pd.DataFrame, indicator: bt.indicator, inplace=False):
+        """adds an indicator and all of it's lines to a dataframe"""
+        ret_df = df
+        if not inplace:
+            ret_df = df.copy()
+
+        for line_index in range(indicator.size()):
+            line = indicator.lines[line_index]
+            name = self._get_indicator_line_name(indicator, line_index)
+            indicator_vals = line.plotrange(0, len(line))
+
+            ret_df[name] = indicator_vals
+        return ret_df
+
+    def _get_indicator_params_string(self, indicator: bt.indicator):
+        """gets formatted paramaters from an indicator. They will be formatted as like so
+        "param1name=value param2name=value ..."
+        """
+        params_str = ''
+        param_dictionary = vars(indicator.p)
+        if not param_dictionary:
+            return params_str
+        
+        for key, value in param_dictionary.items():
+            params_str += f' {key}={value}'
+        
+        return params_str.strip()
+
+
+    def _get_indicator_line_name(self, indicator: bt.indicator, index=0):
+        alias = indicator.lines._getlinealias(index)
+        return alias + ' (' + self._get_indicator_params_string(indicator) + ')'
+
 
 def add_all_sorted_indicators_to_df(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
     """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
