@@ -48,7 +48,7 @@ def main():
     back = cerebro.run()
     #myp = cerebro.plot(numfigs=1, style='bar')
 
-    my_plot(back[0])
+    DataAndPlotInfoContainer(back[0])
 
 
 
@@ -185,12 +185,14 @@ class DataAndPlotInfoContainer:
 
     def __init__(self, strategy: Type[bt.Strategy]):
         self.cerebro_run = strategy
+        self.series_plotinfo = dict()
+        self.df_list = list()
+        self.go_figure_list = list()
 
         self._populate_dataframe_list_and_plotinfo(strategy)
 
 
     def _populate_dataframe_list_and_plotinfo(self, strategy: Type[bt.Strategy]):
-        df_list = list()
 
         sorted_indicators = self._sort_indicators(strategy)
 
@@ -206,15 +208,17 @@ class DataAndPlotInfoContainer:
             for indicator in sorted_indicators[UPPER][data]:
                 self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
 
+            
+
             for indicator in sorted_indicators[OVERLAY][data]:
                 self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
 
             for indicator in sorted_indicators[LOWER][data]:
                 self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
 
-            df_list.append(df)
+            self.df_list.append(df)
 
-        return df_list
+        return self.df_list
 
     def _sort_indicators(self, strategy: bt.Strategy):
         """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
@@ -282,11 +286,14 @@ class DataAndPlotInfoContainer:
     def _add_all_sorted_indicators_to_df(self, df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
         """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
         for inner_indicator in sorted_indicators[UPPER][indicator]:
+            self.go_figure_list.append(go.Figure())
             self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
         
+        self.go_figure_list.append(go.Figure())
         self._add_indicator_to_df(df, indicator, inplace=True)
 
         for inner_indicator in sorted_indicators[LOWER][indicator]:
+            self.go_figure_list.append(go.Figure())
             self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
 
     def _add_indicator_to_df(self, df: pd.DataFrame, indicator: bt.indicator, inplace=False):
@@ -301,7 +308,19 @@ class DataAndPlotInfoContainer:
             indicator_vals = line.plotrange(0, len(line))
 
             ret_df[name] = indicator_vals
+            plotinfo = self._get_line_plot_info(indicator, line_index)
+            self._add_line_trace_to_figure_list(ret_df, name, plotinfo)
+
         return ret_df
+
+    def _add_line_trace_to_figure_list(self, df, name, plotinfo):
+        """adds a line to a figure taking into account the plotinfo"""
+        #future - add handling for plotinfo here
+
+        line_plot = go.Scatter(x=df.index, y=df[name], name=name)
+
+        self.go_figure_list[len(self.go_figure_list) - 1].add_trace(line_plot)
+
 
     def _get_indicator_params_string(self, indicator: bt.indicator):
         """gets formatted paramaters from an indicator. They will be formatted as like so
@@ -321,6 +340,20 @@ class DataAndPlotInfoContainer:
     def _get_indicator_line_name(self, indicator: bt.indicator, index=0):
         alias = indicator.lines._getlinealias(index)
         return alias + ' (' + self._get_indicator_params_string(indicator) + ')'
+
+    def _get_line_plot_info(self, indicator:bt.indicator, line_index: int):
+        """get the lineplotinfo from an indicator"""
+        line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
+        if line_plot_info:
+            return line_plot_info
+        
+        linealias = indicator.lines._getlinealias(line_index)
+        line_plot_info = getattr(indicator.plotlines, linealias, None)
+        if line_plot_info:
+            return line_plot_info
+
+        #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
+        return bt.AutoInfoClass()
 
 
 def add_all_sorted_indicators_to_df(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
