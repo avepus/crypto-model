@@ -188,6 +188,7 @@ class DataAndPlotInfoContainer:
         self.series_plotinfo = dict()
         self.df_list = list()
         self.go_figure_list = list()
+        self.temp_plot_info = dict()
 
         self._populate_dataframe_list_and_plotinfo(strategy)
 
@@ -317,9 +318,28 @@ class DataAndPlotInfoContainer:
         """adds a line to a figure taking into account the plotinfo"""
         #future - add handling for plotinfo here
 
-        line_plot = go.Scatter(x=df.index, y=df[name], name=name)
+        #temp delete
+        _name = plotinfo.get('_name') #not sure if I should use this
+        marker_dict = self._get_marker_dict(plotinfo)
+        barplot = plotinfo.get('barplot')
+        #end temp delete
+        mode = 'markers' if plotinfo.get('marker') else None
+        
+        line_plot = go.Scatter(mode=mode, x=df.index, y=df[name], name=name, marker=marker_dict)
 
         self.go_figure_list[len(self.go_figure_list) - 1].add_trace(line_plot)
+
+    def _get_marker_dict(self, plotinfo):
+        """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
+        ret_dict = {}
+        if plotinfo.get('color'):
+            ret_dict['color'] = plotinfo.get('color')
+        
+        if plotinfo.get('markersize'):
+            ret_dict['size'] = plotinfo.get('markersize')
+
+        return ret_dict
+
 
 
     def _get_indicator_params_string(self, indicator: bt.indicator):
@@ -345,15 +365,17 @@ class DataAndPlotInfoContainer:
         """get the lineplotinfo from an indicator"""
         line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
         if line_plot_info:
-            return line_plot_info
+            return line_plot_info._get_getkwargs()
         
         linealias = indicator.lines._getlinealias(line_index)
         line_plot_info = getattr(indicator.plotlines, linealias, None)
         if line_plot_info:
-            return line_plot_info
+            return line_plot_info._getkwargs()
 
         #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
-        return bt.AutoInfoClass()
+        return bt.AutoInfoClass()._getkwargs()
+
+
 
 
 def add_all_sorted_indicators_to_df(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
