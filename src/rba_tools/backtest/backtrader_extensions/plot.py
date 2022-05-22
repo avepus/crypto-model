@@ -19,6 +19,17 @@ LOWER = 'lower'
 OVERLAY = 'overlay'
 
 
+MATPLOTLIB_TO_PLOTLY_MARKER_MAP = {
+    '^' : 'triangle-up',
+    'v' : 'triangle-down',
+    'o' : 'circle-dot'
+}
+
+MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
+    'g' : 'green',
+    'lime' : 'green'
+}
+
 def main():
     cerebro = bt.Cerebro(runonce=False)
 
@@ -310,20 +321,20 @@ class DataAndPlotInfoContainer:
 
             ret_df[name] = indicator_vals
             plotinfo = self._get_line_plot_info(indicator, line_index)
+            self.temp_plot_info[name] = plotinfo
             self._add_line_trace_to_figure_list(ret_df, name, plotinfo)
 
         return ret_df
 
     def _add_line_trace_to_figure_list(self, df, name, plotinfo):
         """adds a line to a figure taking into account the plotinfo"""
-        #future - add handling for plotinfo here
 
-        #temp delete
         _name = plotinfo.get('_name') #not sure if I should use this
         marker_dict = self._get_marker_dict(plotinfo)
         barplot = plotinfo.get('barplot')
-        #end temp delete
-        mode = 'markers' if plotinfo.get('marker') else None
+        mode = None
+        if plotinfo.get('marker'):
+            mode = 'markers'
         
         line_plot = go.Scatter(mode=mode, x=df.index, y=df[name], name=name, marker=marker_dict)
 
@@ -334,9 +345,14 @@ class DataAndPlotInfoContainer:
         ret_dict = {}
         if plotinfo.get('color'):
             ret_dict['color'] = plotinfo.get('color')
+            if MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color']):
+                ret_dict['color'] = MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color'])
         
         if plotinfo.get('markersize'):
             ret_dict['size'] = plotinfo.get('markersize')
+
+        if MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker')):
+            ret_dict['symbol'] = MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker'))
 
         return ret_dict
 
