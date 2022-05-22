@@ -61,8 +61,6 @@ def main():
 
     DataAndPlotInfoContainer(back[0])
 
-
-
 def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
     datetime_array = datetime_series.map(num2date)
@@ -211,6 +209,8 @@ class DataAndPlotInfoContainer:
         for index in range(len(strategy.datas)):
             data = strategy.datas[index]
             df = get_ohlcv_data_from_data(data)
+            self.go_figure_list.append(go.Figure())
+            self.go_figure_list[len(self.go_figure_list) - 1].add_trace(self._get_candlestick_plot(df))
 
             if index == 0:
                 #add global top indicators only to the first data
@@ -356,8 +356,6 @@ class DataAndPlotInfoContainer:
 
         return ret_dict
 
-
-
     def _get_indicator_params_string(self, indicator: bt.indicator):
         """gets formatted paramaters from an indicator. They will be formatted as like so
         "param1name=value param2name=value ..."
@@ -390,6 +388,14 @@ class DataAndPlotInfoContainer:
 
         #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
         return bt.AutoInfoClass()._getkwargs()
+
+    def _get_candlestick_plot(self, df: pd.DataFrame):
+        #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
+        return go.Candlestick(x=df.index,
+                open=df['Open'],
+                high=df['High'],
+                low=df['Low'],
+                close=df['Close'])
 
 
 
