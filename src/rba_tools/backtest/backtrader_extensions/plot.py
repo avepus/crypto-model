@@ -209,28 +209,132 @@ class DataAndPlotInfoContainer:
         for index in range(len(strategy.datas)):
             data = strategy.datas[index]
             df = get_ohlcv_data_from_data(data)
-            self.go_figure_list.append(go.Figure())
-            self.go_figure_list[len(self.go_figure_list) - 1].add_trace(self._get_candlestick_plot(df))
+            candlestick_figure = go.Figure()
+            candlestick_figure.add_trace(self._get_candlestick_plot(df))
+            self.go_figure_list.append(candlestick_figure)
 
             if index == 0:
                 #add global top indicators only to the first data
                 for indicator in sorted_indicators[GLOBAL_TOP]:
-                    self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+                    self._populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators)
             
             for indicator in sorted_indicators[UPPER][data]:
-                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
-
-            
+                self._populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators)
 
             for indicator in sorted_indicators[OVERLAY][data]:
-                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+                self._populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, candlestick_figure)
 
             for indicator in sorted_indicators[LOWER][data]:
-                self._add_all_sorted_indicators_to_df(df, indicator, sorted_indicators)
+                self._populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators)
 
             self.df_list.append(df)
 
         return self.df_list
+
+    def _populate_df_and_graphs_from_sorted_indicators(self, df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: dict, figure=None):
+        """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
+        for inner_indicator in sorted_indicators[UPPER][indicator]:
+            self._populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators)
+        
+        self._add_indicator_to_df_and_figure(df, indicator, figure)
+
+        for inner_indicator in sorted_indicators[LOWER][indicator]:
+            self._populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators)
+
+    def _add_indicator_to_df_and_figure(self, df: pd.DataFrame, indicator: bt.indicator, figure=None):
+        """adds an indicator and all of it's lines to the dataframe and to a figure that
+        is appended to the figure_list
+        
+        figure is used to optionally add all indicators to an existing figure rather than
+        creating a new one"""
+        figure_in_list = True
+        if not figure:
+            figure_in_list = False
+            figure = go.Figure()
+
+        for line_index in range(indicator.size()):
+            line = indicator.lines[line_index]
+            name = self._get_indicator_line_name(indicator, line_index)
+            indicator_vals = line.plotrange(0, len(line))
+
+            df[name] = indicator_vals
+            plotinfo = self._get_line_plot_info(indicator, line_index)
+            self.temp_plot_info[name] = plotinfo
+            self._add_line_trace_to_figure_list(figure, df, name, plotinfo)
+
+        if not figure_in_list:
+            self.go_figure_list.append(figure)
+
+    def _add_line_trace_to_figure_list(self, figure, df, name, plotinfo):
+        """adds a line to a figure taking into account the plotinfo"""
+
+        _name = plotinfo.get('_name') #not sure if I should use this
+        marker_dict = self._get_marker_dict(plotinfo)
+        barplot = plotinfo.get('barplot')
+        mode = None
+        if plotinfo.get('marker'):
+            mode = 'markers'
+        
+        line_plot = go.Scatter(mode=mode, x=df.index, y=df[name], name=name, marker=marker_dict)
+
+        figure.add_trace(line_plot)
+
+    def _get_marker_dict(self, plotinfo):
+        """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
+        ret_dict = {}
+        if plotinfo.get('color'):
+            ret_dict['color'] = plotinfo.get('color')
+            if MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color']):
+                ret_dict['color'] = MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color'])
+        
+        if plotinfo.get('markersize'):
+            ret_dict['size'] = plotinfo.get('markersize')
+
+        if MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker')):
+            ret_dict['symbol'] = MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker'))
+
+        return ret_dict
+
+    def _get_indicator_params_string(self, indicator: bt.indicator):
+        """gets formatted paramaters from an indicator. They will be formatted as like so
+        "param1name=value param2name=value ..."
+        """
+        params_str = ''
+        param_dictionary = vars(indicator.p)
+        if not param_dictionary:
+            return params_str
+        
+        for key, value in param_dictionary.items():
+            params_str += f' {key}={value}'
+        
+        return params_str.strip()
+
+
+    def _get_indicator_line_name(self, indicator: bt.indicator, index=0):
+        alias = indicator.lines._getlinealias(index)
+        return alias + ' (' + self._get_indicator_params_string(indicator) + ')'
+
+    def _get_line_plot_info(self, indicator:bt.indicator, line_index: int):
+        """get the lineplotinfo from an indicator"""
+        line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
+        if line_plot_info:
+            return line_plot_info._get_getkwargs()
+        
+        linealias = indicator.lines._getlinealias(line_index)
+        line_plot_info = getattr(indicator.plotlines, linealias, None)
+        if line_plot_info:
+            return line_plot_info._getkwargs()
+
+        #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
+        return bt.AutoInfoClass()._getkwargs()
+
+    def _get_candlestick_plot(self, df: pd.DataFrame):
+        #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
+        return go.Candlestick(x=df.index,
+                open=df['Open'],
+                high=df['High'],
+                low=df['Low'],
+                close=df['Close'])
 
     def _sort_indicators(self, strategy: bt.Strategy):
         """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
@@ -293,109 +397,6 @@ class DataAndPlotInfoContainer:
                 plot_dictionary[OVERLAY][key].append(indicator)
 
         return plot_dictionary
-
-
-    def _add_all_sorted_indicators_to_df(self, df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: True):
-        """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
-        for inner_indicator in sorted_indicators[UPPER][indicator]:
-            self.go_figure_list.append(go.Figure())
-            self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
-        
-        self.go_figure_list.append(go.Figure())
-        self._add_indicator_to_df(df, indicator, inplace=True)
-
-        for inner_indicator in sorted_indicators[LOWER][indicator]:
-            self.go_figure_list.append(go.Figure())
-            self._add_all_sorted_indicators_to_df(df, inner_indicator, sorted_indicators)
-
-    def _add_indicator_to_df(self, df: pd.DataFrame, indicator: bt.indicator, inplace=False):
-        """adds an indicator and all of it's lines to a dataframe"""
-        ret_df = df
-        if not inplace:
-            ret_df = df.copy()
-
-        for line_index in range(indicator.size()):
-            line = indicator.lines[line_index]
-            name = self._get_indicator_line_name(indicator, line_index)
-            indicator_vals = line.plotrange(0, len(line))
-
-            ret_df[name] = indicator_vals
-            plotinfo = self._get_line_plot_info(indicator, line_index)
-            self.temp_plot_info[name] = plotinfo
-            self._add_line_trace_to_figure_list(ret_df, name, plotinfo)
-
-        return ret_df
-
-    def _add_line_trace_to_figure_list(self, df, name, plotinfo):
-        """adds a line to a figure taking into account the plotinfo"""
-
-        _name = plotinfo.get('_name') #not sure if I should use this
-        marker_dict = self._get_marker_dict(plotinfo)
-        barplot = plotinfo.get('barplot')
-        mode = None
-        if plotinfo.get('marker'):
-            mode = 'markers'
-        
-        line_plot = go.Scatter(mode=mode, x=df.index, y=df[name], name=name, marker=marker_dict)
-
-        self.go_figure_list[len(self.go_figure_list) - 1].add_trace(line_plot)
-
-    def _get_marker_dict(self, plotinfo):
-        """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
-        ret_dict = {}
-        if plotinfo.get('color'):
-            ret_dict['color'] = plotinfo.get('color')
-            if MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color']):
-                ret_dict['color'] = MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color'])
-        
-        if plotinfo.get('markersize'):
-            ret_dict['size'] = plotinfo.get('markersize')
-
-        if MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker')):
-            ret_dict['symbol'] = MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker'))
-
-        return ret_dict
-
-    def _get_indicator_params_string(self, indicator: bt.indicator):
-        """gets formatted paramaters from an indicator. They will be formatted as like so
-        "param1name=value param2name=value ..."
-        """
-        params_str = ''
-        param_dictionary = vars(indicator.p)
-        if not param_dictionary:
-            return params_str
-        
-        for key, value in param_dictionary.items():
-            params_str += f' {key}={value}'
-        
-        return params_str.strip()
-
-
-    def _get_indicator_line_name(self, indicator: bt.indicator, index=0):
-        alias = indicator.lines._getlinealias(index)
-        return alias + ' (' + self._get_indicator_params_string(indicator) + ')'
-
-    def _get_line_plot_info(self, indicator:bt.indicator, line_index: int):
-        """get the lineplotinfo from an indicator"""
-        line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
-        if line_plot_info:
-            return line_plot_info._get_getkwargs()
-        
-        linealias = indicator.lines._getlinealias(line_index)
-        line_plot_info = getattr(indicator.plotlines, linealias, None)
-        if line_plot_info:
-            return line_plot_info._getkwargs()
-
-        #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
-        return bt.AutoInfoClass()._getkwargs()
-
-    def _get_candlestick_plot(self, df: pd.DataFrame):
-        #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
-        return go.Candlestick(x=df.index,
-                open=df['Open'],
-                high=df['High'],
-                low=df['Low'],
-                close=df['Close'])
 
 
 
