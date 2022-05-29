@@ -209,8 +209,10 @@ class DataAndPlotInfoContainer:
         for index in range(len(strategy.datas)):
             data = strategy.datas[index]
             df = get_ohlcv_data_from_data(data)
-            candlestick_figure = go.Figure()
-            candlestick_figure.add_trace(self._get_candlestick_plot(df))
+            candlestick_figure = go.Figure(layout = {'title': self._get_candlestick_name_from_bt_datafeed(data),
+                'xaxis' : {'rangeslider': {'visible': False}}
+                })
+            candlestick_figure.add_trace(self._get_candlestick_plot(df), name = self._get_symbol_from_bt_datafeed(data))
             self.go_figure_list.append(candlestick_figure)
 
             if index == 0:
@@ -335,6 +337,30 @@ class DataAndPlotInfoContainer:
                 high=df['High'],
                 low=df['Low'],
                 close=df['Close'])
+
+    def _get_symbol_from_bt_datafeed(self, data):
+        """gets the symbol from a bt datafeed this only works
+        for a pandas datafeed that has a 'Symbol' column"""
+        symbol = ''
+        try:
+            symbol = data._dataname['Symbol'].iat[0]
+        except:
+            pass
+        return symbol
+
+    def _get_timeframe_name_from_bt_datafeed(self, data):
+        """Gets timeframe name. Copied straight from backtrader.plot"""
+        tfname = ''
+        if hasattr(data, '_compression') and \
+           hasattr(data, '_timeframe'):
+            tfname = bt.TimeFrame.getname(data._timeframe, data._compression)
+        return tfname
+
+    def _get_candlestick_name_from_bt_datafeed(self, data):
+        """Creates formatted name of symbol and timeframe for charts"""
+        symbol = self._get_symbol_from_bt_datafeed(data)
+        timeframe_name = self._get_timeframe_name_from_bt_datafeed(data)
+        return symbol + ' ' + timeframe_name
 
     def _sort_indicators(self, strategy: bt.Strategy):
         """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
