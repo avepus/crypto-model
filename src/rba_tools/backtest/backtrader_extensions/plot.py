@@ -197,7 +197,6 @@ class DataAndPlotInfoContainer:
         self.series_plotinfo = dict()
         self.df_list = list()
         self.go_figure_list = list()
-        self.temp_plot_info = dict()
 
         self._populate_dataframe_list_and_plotinfo(strategy)
 
@@ -210,9 +209,10 @@ class DataAndPlotInfoContainer:
             data = strategy.datas[index]
             df = get_ohlcv_data_from_data(data)
             candlestick_figure = go.Figure(layout = {'title': self._get_candlestick_name_from_bt_datafeed(data),
-                'xaxis' : {'rangeslider': {'visible': False}}
+                'xaxis' : {'rangeslider': {'visible': False},
+                           'autorange': True}
                 })
-            candlestick_figure.add_trace(self._get_candlestick_plot(df), name = self._get_symbol_from_bt_datafeed(data))
+            candlestick_figure.add_trace(self._get_candlestick_plot(df))
             self.go_figure_list.append(candlestick_figure)
 
             if index == 0:
@@ -252,7 +252,7 @@ class DataAndPlotInfoContainer:
         figure_in_list = True
         if not figure:
             figure_in_list = False
-            figure = go.Figure()
+            figure = go.Figure(layout={'title': type(indicator).__name__})
 
         for line_index in range(indicator.size()):
             line = indicator.lines[line_index]
@@ -261,7 +261,6 @@ class DataAndPlotInfoContainer:
 
             df[name] = indicator_vals
             plotinfo = self._get_line_plot_info(indicator, line_index)
-            self.temp_plot_info[name] = plotinfo
             self._add_line_trace_to_figure_list(figure, df, name, plotinfo)
 
         if not figure_in_list:
