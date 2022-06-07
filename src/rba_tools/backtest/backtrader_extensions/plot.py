@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Type
+from typing import OrderedDict, Type
 from dataclasses import dataclass,field
 import backtrader as bt
 from datetime import datetime
@@ -65,7 +65,23 @@ def main():
 class DataAndPlots:
     """class holding a dataframe and its plots"""
     df: pd.DataFrame
-    plot_list: list()
+    plot_dict: dict()
+
+
+@dataclass
+class LinePlotInfo:
+    line_name: str
+    plotinfo: OrderedDict
+    marker: dict = field(init=False)
+
+    def __post_init__(self):
+        self.marker = get_marker_dict(self.plotinfo)
+
+
+@dataclass
+class IndicatorPlotInfo:
+    indicator_name: str
+    line_list: list[LinePlotInfo]
 
 class DataAndPlotInfoContainer:
     """Class holding the results of a cerebro run in a usable format
@@ -83,7 +99,6 @@ class DataAndPlotInfoContainer:
         self.cerebro_run = strategy
         self.data_and_plots_list = get_dataframe_and_plot_dict(strategy)
 
-
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
     """takes in a strategy and returns a list of DataAndPlots objects
     that hold the dataframe for a datafeed and the plots"""
@@ -93,19 +108,17 @@ def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
     return_list = []
 
     for index in range(len(strategy.datas)):
-        go_figure_list = []
+        plot_info_dict = {}
         data = strategy.datas[index]
         df = get_ohlcv_data_from_data(data)
-        candlestick_figure = get_candlestick_figure(data)
-        go_figure_list.append(candlestick_figure)
 
-        add_figures_from_sorted_indicators(index, df, sorted_indicators, go_figure_list, data, candlestick_figure)
+        add_figures_from_sorted_indicators(index, df, sorted_indicators, data, plot_info_dict)
 
-        return_list.append(DataAndPlots(df, go_figure_list))
+        return_list.append(DataAndPlots(df, plot_info_dict))
 
     return return_list
 
-def add_figures_from_sorted_indicators(index: int, df: pd.DataFrame, sorted_indicators: dict, go_figure_list: list, data, candlestick_figure: go.Figure):
+def add_figures_from_sorted_indicators(index: int, df: pd.DataFrame, sorted_indicators: dict, data, plot_info_dict: dict):
     """Adds all indicator lines to the passed in dataframe and the go_figure_list
 
     Args:
@@ -118,49 +131,47 @@ def add_figures_from_sorted_indicators(index: int, df: pd.DataFrame, sorted_indi
     if index == 0:
         #add global top indicators only to the first data
         for indicator in sorted_indicators[GLOBAL_TOP]:
-            populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, go_figure_list)
+            populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
     
     for indicator in sorted_indicators[UPPER][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, go_figure_list)
+        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
 
     for indicator in sorted_indicators[OVERLAY][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, go_figure_list, candlestick_figure)
+        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict, overlay=True)
 
     for indicator in sorted_indicators[LOWER][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, go_figure_list)
+        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
 
-def populate_df_and_graphs_from_sorted_indicators(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: dict, go_figure_list: list, figure=None):
+def populate_df_and_graphs_from_sorted_indicators(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: dict, plot_info_dict: dict, overlay=False):
     """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
     for inner_indicator in sorted_indicators[UPPER][indicator]:
-        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, go_figure_list)
+        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, plot_info_dict)
     
-    add_indicator_to_df_and_figure(df, indicator, go_figure_list, figure)
+    add_indicator_to_df_and_figure(df, indicator, plot_info_dict, overlay)
 
     for inner_indicator in sorted_indicators[LOWER][indicator]:
-        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, go_figure_list)
+        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, plot_info_dict)
 
-def add_indicator_to_df_and_figure(df: pd.DataFrame, indicator: bt.indicator, go_figure_list: list, figure=None):
+def add_indicator_to_df_and_figure(df: pd.DataFrame, indicator: bt.indicator, plot_info_dict: dict, overlay=False):
     """adds an indicator and all of it's lines to the dataframe and to a figure that
     is appended to the figure_list
     
     figure is used to optionally add all indicators to an existing figure rather than
     creating a new one"""
-    figure_in_list = True
-    if not figure:
-        figure_in_list = False
-        figure = go.Figure(layout={'title': type(indicator).__name__})
+    lpi_list = []
 
     for line_index in range(indicator.size()):
         line = indicator.lines[line_index]
         name = get_indicator_line_name(indicator, line_index)
         indicator_vals = line.plotrange(0, len(line))
-
         df[name] = indicator_vals
-        plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
-        add_line_trace_to_figure_list(figure, df, name, plotinfo)
 
-    if not figure_in_list:
-        go_figure_list.append(figure)
+        plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
+        plotinfo['_overlay'] = overlay
+        lpi_list.append(LinePlotInfo(name, plotinfo))
+    plot_info_dict[type(indicator).__name__] = plots_dict
+
+
 
 def add_line_trace_to_figure_list(figure, df, name, plotinfo):
     """adds a line to a figure taking into account the plotinfo"""
