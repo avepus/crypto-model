@@ -159,8 +159,8 @@ def add_indicator_to_df_and_figure(df: pd.DataFrame, indicator: bt.indicator, go
         plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
         add_line_trace_to_figure_list(figure, df, name, plotinfo)
 
-        if not figure_in_list:
-            go_figure_list.append(figure)
+    if not figure_in_list:
+        go_figure_list.append(figure)
 
 def add_line_trace_to_figure_list(figure, df, name, plotinfo):
     """adds a line to a figure taking into account the plotinfo"""
