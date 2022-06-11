@@ -13,22 +13,7 @@ import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
 
 
 
-GLOBAL_TOP = 'global_top'
-UPPER = 'upper'
-LOWER = 'lower'
-OVERLAY = 'overlay'
 
-
-MATPLOTLIB_TO_PLOTLY_MARKER_MAP = {
-    '^' : 'triangle-up',
-    'v' : 'triangle-down',
-    'o' : 'circle-dot'
-}
-
-MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
-    'g' : 'green',
-    'lime' : 'green'
-}
 
 def main():
     cerebro = bt.Cerebro(runonce=False)
@@ -61,180 +46,12 @@ def main():
 
     DataAndPlotInfoContainer(back[0])
 
-@dataclass
-class DataAndPlots:
-    """class holding a dataframe and its plots"""
-    df: pd.DataFrame
-    plot_dict: dict()
-
-
-@dataclass
-class LinePlotInfo:
-    line_name: str
-    plotinfo: OrderedDict
-    marker: dict = field(init=False)
-
-    def __post_init__(self):
-        self.marker = get_marker_dict(self.plotinfo)
-
-
-@dataclass
-class IndicatorPlotInfo:
-    indicator_name: str
-    line_list: list[LinePlotInfo]
-
-class DataAndPlotInfoContainer:
-    """Class holding the results of a cerebro run in a usable format
-
-    strategy is a BackTrader strategy object that has been run through a cerebro
-
-    dataframe_list is a list of dataframes that contain all the values from all indicators
-        and data feeds
-
-    plotinfo is a dictionary that maps the series objects in the dataframes to the plot
-        options for each line
-    """
-
-    def __init__(self, strategy: Type[bt.Strategy]):
-        self.cerebro_run = strategy
-        self.data_and_plots_list = get_dataframe_and_plot_dict(strategy)
-
-def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
-    """takes in a strategy and returns a list of DataAndPlots objects
-    that hold the dataframe for a datafeed and the plots"""
-
-    sorted_indicators = sort_indicators(strategy)
-
-    return_list = []
-
-    for index in range(len(strategy.datas)):
-        plot_info_dict = {}
-        data = strategy.datas[index]
-        df = get_ohlcv_data_from_data(data)
-
-        add_figures_from_sorted_indicators(index, df, sorted_indicators, data, plot_info_dict)
-
-        return_list.append(DataAndPlots(df, plot_info_dict))
-
-    return return_list
-
-def add_figures_from_sorted_indicators(index: int, df: pd.DataFrame, sorted_indicators: dict, data, plot_info_dict: dict):
-    """Adds all indicator lines to the passed in dataframe and the go_figure_list
-
-    Args:
-        index (int): current index of strategy datas being looped over
-        df (pd.DataFrame): DataFrame which data will be added to
-        sorted_indicators (dict): dictionary of sorted indicators
-        go_figure_list (list): list of figures that new figures will be appended to
-        data (_type_): backtrader data feed currently being run over
-    """
-    if index == 0:
-        #add global top indicators only to the first data
-        for indicator in sorted_indicators[GLOBAL_TOP]:
-            populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
-    
-    for indicator in sorted_indicators[UPPER][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
-
-    for indicator in sorted_indicators[OVERLAY][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict, overlay=True)
-
-    for indicator in sorted_indicators[LOWER][data]:
-        populate_df_and_graphs_from_sorted_indicators(df, indicator, sorted_indicators, plot_info_dict)
-
-def populate_df_and_graphs_from_sorted_indicators(df: pd.DataFrame, indicator: bt.indicator, sorted_indicators: dict, plot_info_dict: dict, overlay=False):
-    """adds mapped top and bottom indicators and the passed in indicator to dataframe"""
-    for inner_indicator in sorted_indicators[UPPER][indicator]:
-        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, plot_info_dict)
-    
-    add_indicator_to_df_and_figure(df, indicator, plot_info_dict, overlay)
-
-    for inner_indicator in sorted_indicators[LOWER][indicator]:
-        populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, plot_info_dict)
-
-def add_indicator_to_df_and_figure(df: pd.DataFrame, indicator: bt.indicator, plot_info_dict: dict, overlay=False):
-    """adds an indicator and all of it's lines to the dataframe and to a figure that
-    is appended to the figure_list
-    
-    figure is used to optionally add all indicators to an existing figure rather than
-    creating a new one"""
-    lpi_list = []
-
-    for line_index in range(indicator.size()):
-        line = indicator.lines[line_index]
-        name = get_indicator_line_name(indicator, line_index)
-        indicator_vals = line.plotrange(0, len(line))
-        df[name] = indicator_vals
-
-        plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
-        plotinfo['_overlay'] = overlay
-        lpi_list.append(LinePlotInfo(name, plotinfo))
-    plot_info_dict[type(indicator).__name__] = plots_dict
 
 
 
-def add_line_trace_to_figure_list(figure, df, name, plotinfo):
-    """adds a line to a figure taking into account the plotinfo"""
-
-    _name = plotinfo.get('_name') #not sure if I should use this
-    marker_dict = get_marker_dict(plotinfo)
-    barplot = plotinfo.get('barplot')
-    mode = None
-    if plotinfo.get('marker'):
-        mode = 'markers'
-    
-    line_plot = go.Scatter(mode=mode, x=df.index, y=df[name], name=name, marker=marker_dict)
-
-    figure.add_trace(line_plot)
-
-def get_marker_dict(plotinfo):
-    """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
-    ret_dict = {}
-    if plotinfo.get('color'):
-        ret_dict['color'] = plotinfo.get('color')
-        if MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color']):
-            ret_dict['color'] = MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color'])
-    
-    if plotinfo.get('markersize'):
-        ret_dict['size'] = plotinfo.get('markersize')
-
-    if MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker')):
-        ret_dict['symbol'] = MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker'))
-
-    return ret_dict
-
-def get_indicator_params_string(indicator: bt.indicator):
-    """gets formatted paramaters from an indicator. They will be formatted as like so
-    "param1name=value param2name=value ..."
-    """
-    params_str = ''
-    param_dictionary = vars(indicator.p)
-    if not param_dictionary:
-        return params_str
-    
-    for key, value in param_dictionary.items():
-        params_str += f' {key}={value}'
-    
-    return params_str.strip()
 
 
-def get_indicator_line_name(indicator: bt.indicator, index=0):
-    alias = indicator.lines._getlinealias(index)
-    return alias + ' (' + get_indicator_params_string(indicator) + ')'
 
-def get_line_plot_info_from_indicator_line(indicator:bt.indicator, line_index: int):
-    """get the lineplotinfo from an indicator"""
-    line_plot_info = getattr(indicator.plotlines, '_%d' % line_index, None)
-    if line_plot_info:
-        return line_plot_info._get_getkwargs()
-    
-    linealias = indicator.lines._getlinealias(line_index)
-    line_plot_info = getattr(indicator.plotlines, linealias, None)
-    if line_plot_info:
-        return line_plot_info._getkwargs()
-
-    #bt.AutoInfoClass() is what backtrader gets as the plot_info if we can't get it from the line
-    return bt.AutoInfoClass()._getkwargs()
 
 def get_candlestick_plot(df: pd.DataFrame):
     #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
@@ -243,6 +60,7 @@ def get_candlestick_plot(df: pd.DataFrame):
             high=df['High'],
             low=df['Low'],
             close=df['Close'])
+
 
 def get_candlestick_figure(data):
     """get a candlestick figure from a datafeed"""
@@ -254,6 +72,7 @@ def get_candlestick_figure(data):
     fig.add_trace(get_candlestick_plot(df))
     return fig
 
+
 def get_symbol_from_bt_datafeed(data):
     """gets the symbol from a bt datafeed this only works
     for a pandas datafeed that has a 'Symbol' column"""
@@ -264,6 +83,7 @@ def get_symbol_from_bt_datafeed(data):
         pass
     return symbol
 
+
 def get_timeframe_name_from_bt_datafeed(data):
     """Gets timeframe name. Copied straight from backtrader.plot"""
     tfname = ''
@@ -272,73 +92,13 @@ def get_timeframe_name_from_bt_datafeed(data):
         tfname = bt.TimeFrame.getname(data._timeframe, data._compression)
     return tfname
 
+
 def get_candlestick_name_from_bt_datafeed(data):
     """Creates formatted name of symbol and timeframe for charts"""
     symbol = get_symbol_from_bt_datafeed(data)
     timeframe_name = get_timeframe_name_from_bt_datafeed(data)
     return symbol + ' ' + timeframe_name
 
-def sort_indicators(strategy: bt.Strategy):
-    """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
-    # These lists/dictionaries hold the subplots that go above each data
-    plot_dictionary = {
-        GLOBAL_TOP : list(),
-        UPPER : defaultdict(list),
-        LOWER : defaultdict(list),
-        OVERLAY : defaultdict(list)
-    }
-
-    # Sort observers in the different lists/dictionaries
-    for observer in strategy.getobservers():
-        if not observer.plotinfo.plot or observer.plotinfo.plotskip:
-            continue
-
-        if observer.plotinfo.subplot:
-            plot_dictionary[GLOBAL_TOP].append(observer)
-        else:
-            key = getattr(observer._clock, 'owner', observer._clock)
-            plot_dictionary[OVERLAY][key].append(observer)
-
-    # Sort indicators in the different lists/dictionaries
-    for indicator in strategy.getindicators():
-        if not hasattr(indicator, 'plotinfo'):
-            # no plotting support - so far LineSingle derived classes
-            continue
-
-        if not indicator.plotinfo.plot or indicator.plotinfo.plotskip:
-            continue
-
-        indicator._plotinit()  # will be plotted ... call its init function
-
-        # support LineSeriesStub which has "owner" to point to the data
-        key = getattr(indicator._clock, 'owner', indicator._clock)
-        if key is strategy:  # a LinesCoupler
-            key = strategy.data
-
-        if getattr(indicator.plotinfo, 'plotforce', False):
-            if key not in strategy.datas:
-                datas = strategy.datas
-                while True:
-                    if key not in strategy.datas:
-                        key = key._clock
-                    else:
-                        break
-
-        xpmaster = indicator.plotinfo.plotmaster
-        if xpmaster is indicator:
-            xpmaster = None
-        if xpmaster is not None:
-            key = xpmaster
-
-        if indicator.plotinfo.subplot and xpmaster is None:
-            if indicator.plotinfo.plotabove:
-                plot_dictionary[UPPER][key].append(indicator)
-            else:
-                plot_dictionary[LOWER][key].append(indicator)
-        else:
-            plot_dictionary[OVERLAY][key].append(indicator)
-
-    return plot_dictionary
 
 def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
@@ -346,355 +106,11 @@ def get_datetime(strategy):
     return pd.to_datetime(datetime_array)
 
 
-def rbs_sort_indicators(strategy: bt.Strategy):
-    """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary"""
-    # These lists/dictionaries hold the subplots that go above each data
-    plot_dictionary = {
-        GLOBAL_TOP : list(),
-        UPPER : defaultdict(list),
-        LOWER : defaultdict(list),
-        OVERLAY : defaultdict(list)
-    }
 
-    # Sort observers in the different lists/dictionaries
-    for observer in strategy.getobservers():
-        if not observer.plotinfo.plot or observer.plotinfo.plotskip:
-            continue
 
-        if observer.plotinfo.subplot:
-            plot_dictionary[GLOBAL_TOP].append(observer)
-        else:
-            key = getattr(observer._clock, 'owner', observer._clock)
-            plot_dictionary[OVERLAY][key].append(observer)
 
-    # Sort indicators in the different lists/dictionaries
-    for indicator in strategy.getindicators():
-        if not hasattr(indicator, 'plotinfo'):
-            # no plotting support - so far LineSingle derived classes
-            continue
 
-        if not indicator.plotinfo.plot or indicator.plotinfo.plotskip:
-            continue
 
-        indicator._plotinit()  # will be plotted ... call its init function
-
-        # support LineSeriesStub which has "owner" to point to the data
-        key = getattr(indicator._clock, 'owner', indicator._clock)
-        if key is strategy:  # a LinesCoupler
-            key = strategy.data
-
-        if getattr(indicator.plotinfo, 'plotforce', False):
-            if key not in strategy.datas:
-                datas = strategy.datas
-                while True:
-                    if key not in strategy.datas:
-                        key = key._clock
-                    else:
-                        break
-
-        xpmaster = indicator.plotinfo.plotmaster
-        if xpmaster is indicator:
-            xpmaster = None
-        if xpmaster is not None:
-            key = xpmaster
-
-        if indicator.plotinfo.subplot and xpmaster is None:
-            if indicator.plotinfo.plotabove:
-                plot_dictionary[UPPER][key].append(indicator)
-            else:
-                plot_dictionary[LOWER][key].append(indicator)
-        else:
-            plot_dictionary[OVERLAY][key].append(indicator)
-
-    return plot_dictionary
-
-
-def get_ohlcv_data_from_data(data):
-    #get ohlcv dataframe from a backtrader feed
-    start = 0
-    end = len(data)
-    datetime_float_ary = data.datetime.plot()
-    datetime_list = [num2date(float_date) for float_date in datetime_float_ary]
-    index = np.array(datetime_list)
-    return pd.DataFrame(data={
-        'Open' : data.open.plotrange(start,end),
-        'High' : data.high.plotrange(start,end),
-        'Low' : data.low.plotrange(start,end),
-        'Close' : data.close.plotrange(start,end),
-        'Volume' : data.volume.plotrange(start,end)
-        },
-        index=index)
-
-
-
-
-
-
-
-
-def plot(self, strategy, figid=0, numfigs=1, iplot=True, **kwargs):
-        # pfillers={}):
-        if not strategy.datas:
-            return
-
-        if not len(strategy):
-            return
-
-        self.sortdataindicators(strategy)
-        self.calcrows(strategy)
-
-        st_dtime = strategy.lines.datetime.plot()
-        start = 0
-        end = len(st_dtime)
-
-        # slen = len(st_dtime[start:end])
-        # d, m = divmod(slen, numfigs)
-        # pranges = list()
-        # for i in range(numfigs):
-        #     a = d * i + start
-        #     if i == (numfigs - 1):
-        #         d += m  # add remainder to last stint
-        #     b = a + d
-
-        #     pranges.append([a, b, d])
-
-        figs = []
-
-        # prepare a figure
-        fig = self.pinf.newfig(figid, numfig, self.mpyplot)
-        figs.append(fig)
-
-        self.pinf.pstart, self.pinf.pend, self.pinf.psize = pranges[numfig]
-        self.pinf.xstart = self.pinf.pstart
-        self.pinf.xend = self.pinf.pend
-
-        self.pinf.clock = strategy
-        self.pinf.xreal = self.pinf.clock.datetime.plot(
-            self.pinf.pstart, self.pinf.psize)
-        self.pinf.xlen = len(self.pinf.xreal)
-        self.pinf.x = list(range(self.pinf.xlen))
-        # self.pinf.pfillers = {None: []}
-        # for key, val in pfillers.items():
-        #     pfstart = bisect.bisect_left(val, self.pinf.pstart)
-        #     pfend = bisect.bisect_right(val, self.pinf.pend)
-        #     self.pinf.pfillers[key] = val[pfstart:pfend]
-
-        # Do the plotting
-        # Things that go always at the top (observers)
-        for ptop in self.dplotstop:
-            self.plotind(None, ptop, subinds=self.dplotsover[ptop])
-
-        # Create the rest on a per data basis
-        for data in strategy.datas:
-            if not data.plotinfo.plot:
-                continue
-
-            self.pinf.xdata = self.pinf.x
-            xd = data.datetime.plotrange(self.pinf.xstart, self.pinf.xend)
-            if len(xd) < self.pinf.xlen:
-                self.pinf.xdata = xdata = []
-                xreal = self.pinf.xreal
-                dts = data.datetime.plot()
-                xtemp = list()
-                for dt in (x for x in dts if dt0 <= x <= dt1):
-                    dtidx = bisect.bisect_left(xreal, dt)
-                    xdata.append(dtidx)
-                    xtemp.append(dt)
-
-                self.pinf.xstart = bisect.bisect_left(dts, xtemp[0])
-                self.pinf.xend = bisect.bisect_right(dts, xtemp[-1])
-
-            for ind in self.dplotsup[data]:
-                self.plotind(
-                    data,
-                    ind,
-                    subinds=self.dplotsover[ind],
-                    upinds=self.dplotsup[ind],
-                    downinds=self.dplotsdown[ind])
-
-            self.plotdata(data, self.dplotsover[data])
-
-            for ind in self.dplotsdown[data]:
-                self.plotind(
-                    data,
-                    ind,
-                    subinds=self.dplotsover[ind],
-                    upinds=self.dplotsup[ind],
-                    downinds=self.dplotsdown[ind])
-
-
-        return figs
-
-
-def plotind(self, iref, ind,
-                subinds=None, upinds=None, downinds=None,
-                masterax=None):
-
-        sch = self.p.scheme
-
-        # check subind
-        subinds = subinds or []
-        upinds = upinds or []
-        downinds = downinds or []
-
-        # plot subindicators on self with independent axis above
-        for upind in upinds:
-            self.plotind(iref, upind)
-
-        # Get an axis for this plot
-        ax = masterax or self.newaxis(ind, rowspan=self.pinf.sch.rowsminor)
-
-        indlabel = ind.plotlabel()
-
-        for lineidx in range(ind.size()):
-            line = ind.lines[lineidx]
-            linealias = ind.lines._getlinealias(lineidx)
-
-            lineplotinfo = getattr(ind.plotlines, '_%d' % lineidx, None)
-            if not lineplotinfo:
-                lineplotinfo = getattr(ind.plotlines, linealias, None)
-
-            if not lineplotinfo:
-                lineplotinfo = bt.AutoInfoClass()
-
-            if lineplotinfo._get('_plotskip', False):
-                continue
-
-
-            # plot data
-            lplot = line.plotrange(self.pinf.xstart, self.pinf.xend)
-
-            # Global and generic for indicator
-            if self.pinf.sch.linevalues and ind.plotinfo.plotlinevalues:
-                plotlinevalue = lineplotinfo._get('_plotvalue', True)
-                if plotlinevalue and not math.isnan(lplot[-1]):
-                    label += ' %.2f' % lplot[-1]
-
-            plotkwargs = dict()
-            linekwargs = lineplotinfo._getkwargs(skip_=True)
-
-            if linekwargs.get('color', None) is None:
-                if not lineplotinfo._get('_samecolor', False):
-                    self.pinf.nextcolor(ax)
-                plotkwargs['color'] = self.pinf.color(ax)
-
-            plotkwargs.update(dict(aa=True, label=label))
-            plotkwargs.update(**linekwargs)
-
-            if ax in self.pinf.zorder:
-                plotkwargs['zorder'] = self.pinf.zordernext(ax)
-
-            pltmethod = getattr(ax, lineplotinfo._get('_method', 'plot'))
-
-            xdata, lplotarray = self.pinf.xdata, lplot
-            if lineplotinfo._get('_skipnan', False):
-                # Get the full array and a mask to skipnan
-                lplotarray = np.array(lplot)
-                lplotmask = np.isfinite(lplotarray)
-
-                # Get both the axis and the data masked
-                lplotarray = lplotarray[lplotmask]
-                xdata = np.array(xdata)[lplotmask]
-
-            plottedline = pltmethod(xdata, lplotarray, **plotkwargs)
-            try:
-                plottedline = plottedline[0]
-            except:
-                # Possibly a container of artists (when plotting bars)
-                pass
-
-            self.pinf.zorder[ax] = plottedline.get_zorder()
-
-            vtags = lineplotinfo._get('plotvaluetags', True)
-            if self.pinf.sch.valuetags and vtags:
-                linetag = lineplotinfo._get('_plotvaluetag', True)
-                if linetag and not math.isnan(lplot[-1]):
-                    # line has valid values, plot a tag for the last value
-                    self.drawtag(ax, len(self.pinf.xreal), lplot[-1],
-                                 facecolor='white',
-                                 edgecolor=self.pinf.color(ax))
-
-            farts = (('_gt', operator.gt), ('_lt', operator.lt), ('', None),)
-            for fcmp, fop in farts:
-                fattr = '_fill' + fcmp
-                fref, fcol = lineplotinfo._get(fattr, (None, None))
-                if fref is not None:
-                    y1 = np.array(lplot)
-                    if isinstance(fref, integer_types):
-                        y2 = np.full_like(y1, fref)
-                    else:  # string, naming a line, nothing else is supported
-                        l2 = getattr(ind, fref)
-                        prl2 = l2.plotrange(self.pinf.xstart, self.pinf.xend)
-                        y2 = np.array(prl2)
-                    kwargs = dict()
-                    if fop is not None:
-                        kwargs['where'] = fop(y1, y2)
-
-                    falpha = self.pinf.sch.fillalpha
-                    if isinstance(fcol, (list, tuple)):
-                        fcol, falpha = fcol
-
-                    ax.fill_between(self.pinf.xdata, y1, y2,
-                                    facecolor=fcol,
-                                    alpha=falpha,
-                                    interpolate=True,
-                                    **kwargs)
-
-        # plot subindicators that were created on self
-        for subind in subinds:
-            self.plotind(iref, subind, subinds=self.dplotsover[subind],
-                         masterax=ax)
-
-        if not masterax:
-            # adjust margin if requested ... general of particular
-            ymargin = ind.plotinfo._get('plotymargin', 0.0)
-            ymargin = max(ymargin, self.pinf.sch.yadjust)
-            if ymargin:
-                ax.margins(y=ymargin)
-
-            # Set specific or generic ticks
-            yticks = ind.plotinfo._get('plotyticks', [])
-            if not yticks:
-                yticks = ind.plotinfo._get('plotyhlines', [])
-
-            if yticks:
-                ax.set_yticks(yticks)
-            else:
-                locator = mticker.MaxNLocator(nbins=4, prune='both')
-                ax.yaxis.set_major_locator(locator)
-
-            # Set specific hlines if asked to
-            hlines = ind.plotinfo._get('plothlines', [])
-            if not hlines:
-                hlines = ind.plotinfo._get('plotyhlines', [])
-            for hline in hlines:
-                ax.axhline(hline, color=self.pinf.sch.hlinescolor,
-                           ls=self.pinf.sch.hlinesstyle,
-                           lw=self.pinf.sch.hlineswidth)
-
-            if self.pinf.sch.legendind and \
-               ind.plotinfo._get('plotlegend', True):
-
-                handles, labels = ax.get_legend_handles_labels()
-                # Ensure that we have something to show
-                if labels:
-                    # location can come from the user
-                    loc = ind.plotinfo.legendloc or self.pinf.sch.legendindloc
-
-                    # Legend done here to ensure it includes all plots
-                    legend = ax.legend(loc=loc,
-                                       numpoints=1, frameon=False,
-                                       shadow=False, fancybox=False,
-                                       prop=self.pinf.prop)
-
-                    # legend.set_title(indlabel, prop=self.pinf.prop)
-                    # hack: if title is set. legend has a Vbox for the labels
-                    # which has a default "center" set
-                    legend._legend_box.align = 'left'
-
-        # plot subindicators on self with independent axis below
-        for downind in downinds:
-            self.plotind(iref, downind)
 
 
 
