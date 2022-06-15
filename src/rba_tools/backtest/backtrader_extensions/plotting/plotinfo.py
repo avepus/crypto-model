@@ -34,11 +34,11 @@ class LinePlotInfo:
     This is the individual line level of the plotting"""
     line_name: str
     plotinfo: OrderedDict
-    marker: dict = field(init=False)
+    markers: dict = field(init=False)
     mode: str = field(init=False)
 
     def __post_init__(self):
-        self.marker = get_marker_dict(self.plotinfo)
+        self.markers = get_marker_dict(self.plotinfo)
         self.mode = None #need handling for other modes based on plotinfo
 
 def get_marker_dict(plotinfo):
@@ -73,6 +73,7 @@ class DataPlotInfo:
     as well as the list of the IndicatorPlotInfo objects from that run
     This is the "timeframe" level of reporting"""
     df: DataFrame
+    symbol: str
     indicator_list: list[IndicatorPlotInfo]
 
 @dataclass
@@ -106,10 +107,11 @@ def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
         indicator_list = []
         data = strategy.datas[index]
         df = get_ohlcv_data_from_data(data)
+        symbol = get_symbol_from_bt_datafeed(data)
 
         add_figures_from_sorted_indicators(index, df, sorted_indicators, data, indicator_list)
 
-        return_list.append(DataPlotInfo(df, indicator_list))
+        return_list.append(DataPlotInfo(df, symbol, indicator_list))
 
     return return_list
 
@@ -224,6 +226,17 @@ def get_line_plot_info_from_indicator_line(indicator:bt.indicator, line_index: i
     return bt.AutoInfoClass()._getkwargs()
 
 
+def get_symbol_from_bt_datafeed(data):
+    """gets the symbol from a bt datafeed this only works
+    for a pandas datafeed that has a 'Symbol' column"""
+    symbol = None
+    try:
+        symbol = data._dataname['Symbol'].iat[0]
+    except:
+        pass
+    return symbol
+
+
 def sort_indicators(strategy: bt.Strategy):
     """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary.
     I don't like this but figured it was best to keep exactly what backtrader
@@ -287,3 +300,44 @@ def sort_indicators(strategy: bt.Strategy):
             plot_dictionary[OVERLAY][key].append(indicator)
 
     return plot_dictionary
+
+
+
+#unsure if tags below are needed
+
+def get_candlestick_name_from_bt_datafeed(data):
+    """Creates formatted name of symbol and timeframe for charts"""
+    symbol = get_symbol_from_bt_datafeed(data)
+    timeframe_name = get_timeframe_name_from_bt_datafeed(data)
+    return symbol + ' ' + timeframe_name
+
+def get_candlestick_figure(data):
+    """get a candlestick figure from a datafeed"""
+    fig = go.Figure(layout = {'title': get_candlestick_name_from_bt_datafeed(data),
+            'xaxis' : {'rangeslider': {'visible': False},
+                        'autorange': True}
+            })
+    df = get_ohlcv_data_from_data(data)
+    fig.add_trace(get_candlestick_plot(df))
+    return fig
+
+def get_candlestick_plot(df: DataFrame):
+    #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
+    return go.Candlestick(x=df.index,
+            open=df['Open'],
+            high=df['High'],
+            low=df['Low'],
+            close=df['Close'])
+
+def get_timeframe_name_from_bt_datafeed(data):
+    """Gets timeframe name. Copied straight from backtrader.plot"""
+    tfname = ''
+    if hasattr(data, '_compression') and \
+        hasattr(data, '_timeframe'):
+        tfname = bt.TimeFrame.getname(data._timeframe, data._compression)
+    return tfname
+
+def get_datetime(strategy):
+    datetime_series = pd.Series(strategy.datetime.plot())
+    datetime_array = datetime_series.map(num2date)
+    return pd.to_datetime(datetime_array)
