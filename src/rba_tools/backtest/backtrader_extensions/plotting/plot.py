@@ -50,7 +50,7 @@ def main():
 
 def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
     """plots an indicator given the associated DataFrame and plot info"""
-    fig = go.Figure(layout = {'title': indicator_plot_info.indicator_name})
+    fig = go.Figure(layout = {'title': indicator_plot_info.name})
     for line_plot_info in indicator_plot_info.line_list:
         plot = get_plot_from_line_plot_info(df, line_plot_info)
         fig.add_trace(plot)

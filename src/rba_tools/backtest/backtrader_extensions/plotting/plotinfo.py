@@ -1,6 +1,7 @@
-from typing import OrderedDict, Type, Optional, Union
-from collections import defaultdict
-from dataclasses import dataclass,field
+from typing import Type, Optional, Union
+from collections import defaultdict, OrderedDict
+from dataclasses import field
+from marshmallow_dataclass import dataclass
 import backtrader as bt
 from pandas import DataFrame
 import numpy as np
@@ -33,11 +34,13 @@ class LinePlotInfo:
     
     This is the individual line level of the plotting"""
     line_name: str
-    plotinfo: OrderedDict
+    plotinfo: dict
     markers: dict = field(init=False)
     mode: str = field(init=False)
 
     def __post_init__(self):
+        if isinstance(self.plotinfo, OrderedDict):
+            self.plotinfo = dict(self.plotinfo)
         self.markers = get_marker_dict(self.plotinfo)
         self.mode = None #need handling for other modes based on plotinfo
 
@@ -63,7 +66,7 @@ class IndicatorPlotInfo:
     """holds indicator level plot info which consists of the
     name of the indicator and a list of LinePlotInfo objects.
     This is the "figure" level of the plotting"""
-    indicator_name: str
+    name: str
     line_list: list[LinePlotInfo]
 
 
