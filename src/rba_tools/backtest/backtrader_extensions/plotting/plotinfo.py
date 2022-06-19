@@ -1,11 +1,11 @@
 from typing import Type, Optional, Union
 from collections import defaultdict, OrderedDict
-from dataclasses import field
-from marshmallow_dataclass import dataclass
+from dataclasses import field,is_dataclass,asdict,dataclass
 import backtrader as bt
 from pandas import DataFrame
 import numpy as np
 from backtrader.utils import num2date
+from rba_tools.backtest.backtrader_extensions.plotting.PydanticDataFrame import DataFrame
 
 
 GLOBAL_TOP = 'global_top'
@@ -25,9 +25,20 @@ MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
     'lime' : 'green'
 }
 
+# class EnhancedJSONEncoder(json.JSONEncoder):
+#         def default(self, o):
+#             if is_dataclass(o):
+#                 return asdict(o)
+#             return super().default(o)
+
+# #json.dumps(foo, cls=EnhancedJSONEncoder)
+
+def main_test():
+    print('test')
+
 
 @dataclass
-class LinePlotInfo:
+class LinePlotInfo():
     """holds line level plot info which consists of the
     name of the line and the plotinfo dictionary variables
     used to determine how to plot the line.
@@ -62,7 +73,7 @@ def get_marker_dict(plotinfo):
 
 
 @dataclass
-class IndicatorPlotInfo:
+class IndicatorPlotInfo():
     """holds indicator level plot info which consists of the
     name of the indicator and a list of LinePlotInfo objects.
     This is the "figure" level of the plotting"""
@@ -71,7 +82,7 @@ class IndicatorPlotInfo:
 
 
 @dataclass
-class DataPlotInfo:
+class DataPlotInfo():
     """Holds the actual data from the cerebro run in a dataframe
     as well as the list of the IndicatorPlotInfo objects from that run
     This is the "timeframe" level of reporting"""
@@ -79,8 +90,11 @@ class DataPlotInfo:
     symbol: str
     indicator_list: list[IndicatorPlotInfo]
 
+    class Config:
+        arbitrary_types_allowed = True
+
 @dataclass
-class DataAndPlotInfoContainer:
+class DataAndPlotInfoContainer():
     """Class holds a list of DataPlotInfo objects
     This is the "Strategy" level of reporting
 
@@ -97,6 +111,8 @@ class DataAndPlotInfoContainer:
             self.data_and_plots_list = get_dataframe_and_plot_dict(self.strategy)
             self.strategy = type(self.strategy).__name__
 
+    class Config:
+        arbitrary_types_allowed = True
 
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
     """takes in a strategy and returns a list of DataAndPlots objects
@@ -344,3 +360,6 @@ def get_datetime(strategy):
     datetime_series = pd.Series(strategy.datetime.plot())
     datetime_array = datetime_series.map(num2date)
     return pd.to_datetime(datetime_array)
+
+if __name__ == '__main__':
+    main_test()
