@@ -5,7 +5,6 @@ import backtrader as bt
 from pandas import DataFrame
 import numpy as np
 from backtrader.utils import num2date
-from rba_tools.backtest.backtrader_extensions.plotting.PydanticDataFrame import DataFrame
 
 
 GLOBAL_TOP = 'global_top'
