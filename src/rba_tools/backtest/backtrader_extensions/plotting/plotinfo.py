@@ -1,4 +1,4 @@
-from typing import Type, Optional, Union
+from typing import Type, Optional, Union, List
 from collections import defaultdict, OrderedDict
 from dataclasses import field,is_dataclass,asdict,dataclass
 import backtrader as bt
@@ -77,7 +77,7 @@ class IndicatorPlotInfo():
     name of the indicator and a list of LinePlotInfo objects.
     This is the "figure" level of the plotting"""
     name: str
-    line_list: list[LinePlotInfo]
+    line_list: List[LinePlotInfo]
 
 
 @dataclass
@@ -87,7 +87,7 @@ class DataPlotInfo():
     This is the "timeframe" level of reporting"""
     df: DataFrame
     symbol: str
-    indicator_list: list[IndicatorPlotInfo]
+    indicator_list: List[IndicatorPlotInfo]
 
     class Config:
         arbitrary_types_allowed = True
@@ -103,7 +103,7 @@ class DataAndPlotInfoContainer():
     """
 
     strategy: Union[str, bt.Strategy]
-    data_and_plots_list: Optional[list[DataPlotInfo]] = None
+    data_and_plots_list: Optional[List[DataPlotInfo]] = None
 
     def __post_init__(self):
         if isinstance(self.strategy, bt.Strategy):
