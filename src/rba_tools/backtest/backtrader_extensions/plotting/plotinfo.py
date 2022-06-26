@@ -1,10 +1,14 @@
 from typing import Type, Optional, Union, List
+import pickle
+import os
+from pathlib import Path
 from collections import defaultdict, OrderedDict
 from dataclasses import field, dataclass
 import backtrader as bt
 from pandas import DataFrame
 import numpy as np
 from backtrader.utils import num2date
+from rba_tools.constants import get_project_root
 
 
 GLOBAL_TOP = 'global_top'
@@ -100,6 +104,21 @@ class DataAndPlotInfoContainer():
         if isinstance(self.strategy, bt.Strategy):
             self.data_and_plots_list = get_dataframe_and_plot_dict(self.strategy)
             self.strategy = type(self.strategy).__name__
+
+    def pickle(self):
+        """Creates pickle file"""
+        def get_file_name(self):
+            return self.strategy + '.['
+
+        def get_pickle_dir(self):
+            return os.path.join('rba_tools', 'backtest', 'backtrader_extensions', 'data_plot_container_pickles')
+            
+        path = os.path.join(get_project_root(), get_pickle_dir(self), get_file_name(self))
+
+        with open(path, 'wb') as file:
+            pickle.dump(self, file)
+        
+
 
 
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):

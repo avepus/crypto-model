@@ -1,5 +1,6 @@
 from pandas import DataFrame, DatetimeIndex
 from datetime import datetime,date
+from pathlib import Path
 DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol']
 INDEX_HEADER = 'Timestamp'
 
@@ -9,3 +10,6 @@ def empty_ohlcv_df_generator():
 
 def create_midnight_datetime_from_date(_date: date) -> datetime:
     return datetime.combine(_date, datetime.min.time())
+
+def get_project_root() -> Path:
+    return Path(__file__).parent.parent
