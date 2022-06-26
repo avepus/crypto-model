@@ -1,6 +1,6 @@
 from typing import Type, Optional, Union, List
 from collections import defaultdict, OrderedDict
-from dataclasses import field,is_dataclass,asdict,dataclass
+from dataclasses import field, dataclass
 import backtrader as bt
 from pandas import DataFrame
 import numpy as np
@@ -24,13 +24,6 @@ MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
     'lime' : 'green'
 }
 
-# class EnhancedJSONEncoder(json.JSONEncoder):
-#         def default(self, o):
-#             if is_dataclass(o):
-#                 return asdict(o)
-#             return super().default(o)
-
-# #json.dumps(foo, cls=EnhancedJSONEncoder)
 
 def main_test():
     print('test')
@@ -89,8 +82,6 @@ class DataPlotInfo():
     symbol: str
     indicator_list: List[IndicatorPlotInfo]
 
-    class Config:
-        arbitrary_types_allowed = True
 
 @dataclass
 class DataAndPlotInfoContainer():
@@ -110,8 +101,6 @@ class DataAndPlotInfoContainer():
             self.data_and_plots_list = get_dataframe_and_plot_dict(self.strategy)
             self.strategy = type(self.strategy).__name__
 
-    class Config:
-        arbitrary_types_allowed = True
 
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
     """takes in a strategy and returns a list of DataAndPlots objects
