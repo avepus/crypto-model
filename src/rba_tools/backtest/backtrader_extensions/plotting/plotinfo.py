@@ -1,6 +1,8 @@
 from typing import Type, Optional, Union, List
 import pickle
 import os
+from fnmatch import fnmatch
+from datetime import datetime
 from pathlib import Path
 from collections import defaultdict, OrderedDict
 from dataclasses import field, dataclass
@@ -8,7 +10,7 @@ import backtrader as bt
 from pandas import DataFrame
 import numpy as np
 from backtrader.utils import num2date
-from rba_tools.constants import get_project_root
+from rba_tools.constants import get_pickle_root, get_project_root
 
 
 GLOBAL_TOP = 'global_top'
@@ -105,18 +107,28 @@ class DataAndPlotInfoContainer():
             self.data_and_plots_list = get_dataframe_and_plot_dict(self.strategy)
             self.strategy = type(self.strategy).__name__
 
-    def pickle(self):
-        """Creates pickle file"""
-        def get_file_name(self):
-            return self.strategy + '.['
+def pickle_dpic(dpic: DataAndPlotInfoContainer):
+    """Creates pickle file for DataAndPlotInfoContainer"""
+    def get_file_name(dpic: DataAndPlotInfoContainer) -> str:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '_' + dpic.strategy + '.p'
 
-        def get_pickle_dir(self):
-            return os.path.join('rba_tools', 'backtest', 'backtrader_extensions', 'data_plot_container_pickles')
-            
-        path = os.path.join(get_project_root(), get_pickle_dir(self), get_file_name(self))
+    path = os.path.join(get_pickle_root(), get_file_name(dpic))
 
-        with open(path, 'wb') as file:
-            pickle.dump(self, file)
+    with open(path, 'wb') as file:
+        pickle.dump(dpic, file)
+
+def unpickle_last_dpic() -> DataAndPlotInfoContainer:
+    """Unpuckles the most recently pickled DataAndPlotInfoContainer class"""
+    pickle_dir_list = os.listdir(get_pickle_root())
+    dpic_pickle_list = [f for f in pickle_dir_list if fnmatch(f, '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.p')]
+    dpic_pickle_list.sort(reverse = True)
+    path = os.path.join(get_pickle_root(), dpic_pickle_list[0])
+    with open(path, 'rb') as file:
+        return pickle.load(file)
+
+
+
+    
         
 
 
