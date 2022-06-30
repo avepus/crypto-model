@@ -13,7 +13,7 @@ from datetime import timedelta
 class Timeframe:
     """timedelta with more convenient initialization and __str__ methods"""
     timeframe: timedelta
-    TIMEFRAME_MAP_SEC: ClassVar[dict[str, int]] = {
+    TIMEFRAME_MAP_SEC: ClassVar = {
         'S': 1,
         'M': 60,
         'H': 3600,
