@@ -3,14 +3,16 @@ import pickle
 import os
 from fnmatch import fnmatch
 from datetime import datetime
-from pathlib import Path
 from collections import defaultdict, OrderedDict
 from dataclasses import field, dataclass
 import backtrader as bt
 from pandas import DataFrame
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
 from backtrader.utils import num2date
-from rba_tools.constants import get_pickle_root, get_project_root
+from rba_tools.constants import get_pickle_root
+
 
 
 GLOBAL_TOP = 'global_top'
@@ -110,7 +112,7 @@ class DataAndPlotInfoContainer():
 def pickle_dpic(dpic: DataAndPlotInfoContainer):
     """Creates pickle file for DataAndPlotInfoContainer"""
     def get_file_name(dpic: DataAndPlotInfoContainer) -> str:
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S") + '_' + dpic.strategy + '.p'
+        return datetime.now().strftime("%Y-%m-%d %H;%M;%S") + '_' + dpic.strategy + '.p'
 
     path = os.path.join(get_pickle_root(), get_file_name(dpic))
 
