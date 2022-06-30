@@ -12,7 +12,7 @@ from dateutil import parser
 from rba_tools.retriever.timeframe import Timeframe
 import rba_tools.retriever.database_interface as dbi
 import rba_tools.retriever.retrievers as retrievers
-import rba_tools.retriever.constants as constants
+import rba_tools.constants as constants
 import pandas as pd
 
 

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import sqlite3
 from rba_tools.retriever.timeframe import Timeframe
-import rba_tools.retriever.constants as constants
+import rba_tools.constants as constants
 from pathlib import Path
 
 class OHLCVDatabaseInterface(ABC):

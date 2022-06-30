@@ -11,7 +11,7 @@ from zipfile import ZipFile
 import ccxt
 from rba_tools.retriever.timeframe import Timeframe
 import rba_tools.retriever.database_interface as dbi
-import rba_tools.retriever.constants as constants
+import rba_tools.constants as constants
 from rba_tools.exceptions import KrakenFileNotFoundError
 
 class OHLCVDataRetriever(ABC):

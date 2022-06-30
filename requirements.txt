@@ -4,5 +4,4 @@ tox
 plotly
 dash
 backtrader
-matplotlib
 -e .
