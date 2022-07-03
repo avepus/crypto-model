@@ -46,6 +46,7 @@ class LinePlotInfo():
     This is the individual line level of the plotting"""
     line_name: str
     plotinfo: dict
+    overlay: bool = field(default=False)
     markers: dict = field(init=False)
     mode: str = field(init=False)
 
@@ -212,7 +213,7 @@ def populate_df_and_graphs_from_sorted_indicators(df: DataFrame, indicator: bt.i
         populate_df_and_graphs_from_sorted_indicators(df, inner_indicator, sorted_indicators, indicator_list)
 
 
-def add_indicator_to_df_and_figure(df: DataFrame, indicator: bt.indicator, plot_info_dict: dict, overlay=False):
+def add_indicator_to_df_and_figure(df: DataFrame, indicator: bt.indicator, overlay=False):
     """adds an indicator and all of it's lines to the dataframe and to a figure that
     is appended to the figure_list
     
@@ -227,9 +228,7 @@ def add_indicator_to_df_and_figure(df: DataFrame, indicator: bt.indicator, plot_
         df[name] = indicator_vals
 
         plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
-        if overlay:
-            plotinfo['_overlay'] = overlay
-        lpi_list.append(LinePlotInfo(name, plotinfo))
+        lpi_list.append(LinePlotInfo(name, plotinfo, overlay))
 
     return IndicatorPlotInfo(type(indicator).__name__, lpi_list)
 

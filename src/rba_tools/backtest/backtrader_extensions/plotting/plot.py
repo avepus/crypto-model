@@ -52,10 +52,17 @@ def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
     """plots an indicator given the associated DataFrame and plot info"""
     fig = go.Figure(layout = {'title': indicator_plot_info.name,
                                'showlegend': True})
-    for line_plot_info in indicator_plot_info.line_list:
-        plot = get_plot_from_line_plot_info(df, line_plot_info)
+    plot_list = get_indicator_plot_list(df, indicator_plot_info)
+    for plot in plot_list:
         fig.add_trace(plot)
     return fig
+
+def get_indicator_plot_list(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
+    """get list of indicator plots"""
+    plot_list = []
+    for line_plot_info in indicator_plot_info.line_list:
+        plot_list.append(get_plot_from_line_plot_info(df, line_plot_info))
+    return plot_list
 
 def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotInfo):
     """creates a plot for a single line of an indicator"""
@@ -76,7 +83,31 @@ def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo):
                                           'autorange': True}
                              })
     fig.add_trace(get_candlestick_plot_from_df(dpi.df, dpi.symbol))
+    for indicator in dpi.indicator_list:
+        
+        for line_info in indicator.line_list:
+            if not line_info.plotinfo.get('_overlay'):
+                continue
+    plot_list = get_overlay_plot_list_from_dpi(dpi)
+    for plt in plot_list:
+        fig.add_trace(plt)
     return fig
+
+def get_overlay_plot_list_from_indicator(df: pd.DataFrame, indicator: pi.IndicatorPlotInfo):
+    """get list of plots marked overlay from IndicatorPlotInfo"""
+    plot_list = []
+    for line_info in indicator.line_list:
+        if line_info.overlay:
+            plot_list.append(get_plot_from_line_plot_info(df, line_info))
+    return plot_list
+
+def get_overlay_plot_list_from_dpi(dpi: pi.DataPlotInfo):
+    """get list of plots marked overlay from DataPlotInfo"""
+    plot_list = []
+    for ind in dpi.indicator_list:
+        plot_list = plot_list + get_overlay_plot_list_from_indicator(dpi.df, ind)
+    return plot_list
+
 
 def get_candlestick_plot_from_df(df: pd.DataFrame, symbol: str):
     #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
@@ -86,7 +117,6 @@ def get_candlestick_plot_from_df(df: pd.DataFrame, symbol: str):
             low=df['Low'],
             close=df['Close'],
             name=symbol)
-
 
 
 if __name__ == '__main__':
