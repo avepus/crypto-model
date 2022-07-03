@@ -34,7 +34,7 @@ MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
 
 
 def main_test():
-    print('test')
+    print(get_pickle_root())
 
 
 @dataclass
@@ -88,6 +88,7 @@ class DataPlotInfo():
     This is the "timeframe" level of reporting"""
     df: DataFrame
     symbol: str
+    timeframe: str
     indicator_list: List[IndicatorPlotInfo]
 
 
@@ -108,6 +109,7 @@ class DataAndPlotInfoContainer():
         if isinstance(self.strategy, bt.Strategy):
             self.data_and_plots_list = get_dataframe_and_plot_dict(self.strategy)
             self.strategy = type(self.strategy).__name__
+
 
 def pickle_dpic(dpic: DataAndPlotInfoContainer):
     """Creates pickle file for DataAndPlotInfoContainer"""
@@ -148,10 +150,11 @@ def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
         data = strategy.datas[index]
         df = get_ohlcv_data_from_data(data)
         symbol = get_symbol_from_bt_datafeed(data)
+        timeframe = get_timeframe_name_from_bt_datafeed(data)
 
         add_figures_from_sorted_indicators(index, df, sorted_indicators, data, indicator_list)
 
-        return_list.append(DataPlotInfo(df, symbol, indicator_list))
+        return_list.append(DataPlotInfo(df, symbol, timeframe, indicator_list))
 
     return return_list
 

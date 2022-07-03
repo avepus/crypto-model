@@ -50,7 +50,8 @@ def main():
 
 def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
     """plots an indicator given the associated DataFrame and plot info"""
-    fig = go.Figure(layout = {'title': indicator_plot_info.name})
+    fig = go.Figure(layout = {'title': indicator_plot_info.name,
+                               'showlegend': True})
     for line_plot_info in indicator_plot_info.line_list:
         plot = get_plot_from_line_plot_info(df, line_plot_info)
         fig.add_trace(plot)
@@ -58,9 +59,35 @@ def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
 
 def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotInfo):
     """creates a plot for a single line of an indicator"""
-    return go.Scatter(x=df.index, y=df[line_plot_info.line_name], mode=line_plot_info.mode, marker=line_plot_info.markers)
+    return go.Scatter(x=df.index,
+                      y=df[line_plot_info.line_name],
+                      mode=line_plot_info.mode,
+                      marker=line_plot_info.markers,
+                      name=line_plot_info.line_name)
+
+
+
+def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo):
+    """Creates a candle stick plot from a DataPlotInfo"""
+    title = dpi.symbol + ' (' + dpi.timeframe + ')'
+    fig = go.Figure(layout = {'title': title,
+                               'showlegend': True,
+                               'xaxis' : {'rangeslider': {'visible': False},
+                                          'autorange': True}
+                             })
+    fig.add_trace(get_candlestick_plot_from_df(dpi.df, dpi.symbol))
+    return fig
+
+def get_candlestick_plot_from_df(df: pd.DataFrame, symbol: str):
+    #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
+    return go.Candlestick(x=df.index,
+            open=df['Open'],
+            high=df['High'],
+            low=df['Low'],
+            close=df['Close'],
+            name=symbol)
+
 
 
 if __name__ == '__main__':
     main()
-    
