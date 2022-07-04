@@ -121,7 +121,8 @@ class DataAndPlotInfoContainer():
 def pickle_dpic(dpic: DataAndPlotInfoContainer):
     """Creates pickle file for DataAndPlotInfoContainer"""
     def get_file_name(dpic: DataAndPlotInfoContainer) -> str:
-        return datetime.now().strftime("%Y-%m-%d %H;%M;%S") + '_' + dpic.strategy + '.p'
+        symbol = dpic.data_and_plots_list[0].symbol.replace('/','-')
+        return datetime.now().strftime("%Y-%m-%d %H;%M;%S") + '_' + dpic.strategy + '_' + symbol + '.p'
 
     path = os.path.join(get_pickle_root(), get_file_name(dpic))
 
