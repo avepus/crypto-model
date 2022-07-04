@@ -130,7 +130,7 @@ def pickle_dpic(dpic: DataAndPlotInfoContainer):
         pickle.dump(dpic, file)
 
 def unpickle_last_dpic() -> DataAndPlotInfoContainer:
-    """Unpuckles the most recently pickled DataAndPlotInfoContainer class"""
+    """Unpickles the most recently pickled DataAndPlotInfoContainer class"""
     pickle_dir_list = os.listdir(get_pickle_root())
     dpic_pickle_list = [f for f in pickle_dir_list if fnmatch(f, '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.p')]
     dpic_pickle_list.sort(reverse = True)
