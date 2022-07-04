@@ -47,14 +47,14 @@ class LinePlotInfo():
     line_name: str
     plotinfo: dict
     overlay: bool = field(default=False)
+    mode: str = field(default=None)
     markers: dict = field(init=False)
-    mode: str = field(init=False)
 
     def __post_init__(self):
         if isinstance(self.plotinfo, OrderedDict):
             self.plotinfo = dict(self.plotinfo)
         self.markers = get_marker_dict(self.plotinfo)
-        self.mode = None #need handling for other modes based on plotinfo
+
 
 def get_marker_dict(plotinfo):
     """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
@@ -72,6 +72,12 @@ def get_marker_dict(plotinfo):
 
     return ret_dict
 
+def pandas_series_is_continuous(series: pd.Series) -> bool:
+    """returns True if a series contains nan.
+    Ignores the first nan values up to the first valid value and
+    all nan values from the last valid value to the end"""
+    series_first_valid_to_last_valid = series.loc[series.first_valid_index(): series.last_valid_index()]
+    return len(series_first_valid_to_last_valid) == len(series_first_valid_to_last_valid.dropna())
 
 @dataclass
 class IndicatorPlotInfo():
@@ -228,12 +234,14 @@ def add_indicator_to_df_and_figure(df: DataFrame, indicator: bt.indicator, overl
         df[name] = indicator_vals
 
         plotinfo = get_line_plot_info_from_indicator_line(indicator, line_index)
-        lpi_list.append(LinePlotInfo(name, plotinfo, overlay))
+        mode = None if pandas_series_is_continuous(df[name]) else 'markers'
+        lpi_list.append(LinePlotInfo(name, plotinfo, overlay, mode))
 
     return IndicatorPlotInfo(type(indicator).__name__, lpi_list)
 
 
 def get_indicator_line_name(indicator: bt.indicator, index=0):
+    """obtains the name of an individual line of a backtrader indicator"""
     alias = indicator.lines._getlinealias(index)
     return alias + ' (' + get_indicator_params_string(indicator) + ')'
 
