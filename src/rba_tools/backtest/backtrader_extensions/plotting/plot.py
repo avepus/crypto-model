@@ -7,12 +7,11 @@ import plotly.graph_objects as go
 from backtrader.utils import num2date
 import pandas as pd
 import numpy as np
+import rba_tools.constants as constants
 
 from rba_tools.retriever.get_crypto_data import DataPuller
 import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
 import rba_tools.backtest.backtrader_extensions.plotting.plotinfo as pi
-
-
 
 
 
@@ -64,13 +63,20 @@ def get_indicator_plot_list(df: pd.DataFrame, indicator_plot_info: pi.IndicatorP
         plot_list.append(get_plot_from_line_plot_info(df, line_plot_info))
     return plot_list
 
+def truncate_str_to_max_chars(string: str):
+    if len(string) <= constants.PLOT_LEGEND_MAX_CHARACTERS:
+        return string
+    return string[0:18] + '..'
+
+
 def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotInfo):
     """creates a plot for a single line of an indicator"""
+    name = truncate_str_to_max_chars(line_plot_info.line_name)
     return go.Scatter(x=df.index,
                       y=df[line_plot_info.line_name],
                       mode=line_plot_info.mode,
                       marker=line_plot_info.markers,
-                      name=line_plot_info.line_name)
+                      name=name)
 
 
 

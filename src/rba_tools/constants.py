@@ -4,6 +4,7 @@ from os.path import join
 from pathlib import Path
 DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol']
 INDEX_HEADER = 'Timestamp'
+PLOT_LEGEND_MAX_CHARACTERS = 20
 
 def empty_ohlcv_df_generator():
     """Generates a new empty "open, high, low, close, volume" dataframe"""
