@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import OrderedDict, Type
+from typing import Optional, OrderedDict, Type
 from dataclasses import dataclass,field
 import backtrader as bt
 from datetime import datetime
@@ -80,22 +80,21 @@ def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotIn
 
 
 
-def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo):
+def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo, start: Optional[datetime], end: Optional[datetime]):
     """Creates a candle stick plot from a DataPlotInfo"""
     title = dpi.symbol + ' (' + dpi.timeframe + ')'
+    if start:
+        #left off here. replicate logic from update_graph in apptest
     fig = go.Figure(layout = {'title': title,
                                'showlegend': True,
+                               'plot_bgcolor': constants.COLORS['background'],
+                               'paper_bgcolor': constants.COLORS['background'],
                                'xaxis' : {'rangeslider': {'visible': False},
                                           'autorange': True}
                              })
     fig.add_trace(get_candlestick_plot_from_df(dpi.df, dpi.symbol))
-    for indicator in dpi.indicator_list:
-        
-        for line_info in indicator.line_list:
-            if not line_info.plotinfo.get('_overlay'):
-                continue
-    plot_list = get_overlay_plot_list_from_dpi(dpi)
-    for plt in plot_list:
+
+    for plt in get_overlay_plot_list_from_dpi(dpi):
         fig.add_trace(plt)
     return fig
 

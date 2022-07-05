@@ -5,6 +5,11 @@ from pathlib import Path
 DATAFRAME_HEADERS = ['Open', 'High', 'Low', 'Close', 'Volume', 'Symbol']
 INDEX_HEADER = 'Timestamp'
 PLOT_LEGEND_MAX_CHARACTERS = 20
+COLORS = {
+    'background': '#111111',
+    'text': '#7FDBFF',
+    'entry': '#00FF00',
+    'exit': '#FFA07A'}
 
 def empty_ohlcv_df_generator():
     """Generates a new empty "open, high, low, close, volume" dataframe"""

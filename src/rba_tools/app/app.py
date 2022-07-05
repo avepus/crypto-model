@@ -7,55 +7,26 @@ Created on Sunday 1/22/22
 
 """
 
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import dash_table
-from rba_tools.backtest.rba_backtrader_set import BacktraderSet
-import rba_tools.retriever.get_crypto_data as gcd
-import rba_tools.backtest.backtrader_extensions.strategies as strategies
+from dash import dcc, html, Dash
+import plotly.graph_objects as go
+from rba_tools.backtest.backtrader_extensions.plotting.plotinfo import unpickle_last_dpic
 
-from rba_tools.backtest.rba_backtrader_set import BacktraderSet
-
-class RBASetPlotter:
-
-    def __init__(self, set: BacktraderSet, plots: list, start_index: int = 0):
-        """creates app
-
-        Args:
-            set (BacktraderSet): BacktraderSet which will be analyzed in the App
-            plots (list): list of callable functions taking cerebro run data as parameter and returning plotly graph
-            start_index (int, optional): Symbol index to start with. Defaults to 0.
-        """
-        self.set = set
-        self.plots = plots
-        self.index = start_index
-
-
-
-
-kraken_puller = gcd.DataPuller.kraken_puller()
-rba_set = BacktraderSet(['ETH/USD'], strategies.MaCrossStrategy, '1/1/18', '1/1/20', '1d', kraken_puller)
-
-#set_plotter = RBASetPlotter(rba_set, [])
-
-
-
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
-dash_app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
+app_dict = {'dpic': unpickle_last_dpic()}
 colors = {
     'background': '#111111',
     'text': '#7FDBFF',
     'entry': '#00FF00',
     'exit': '#FFA07A'}
 
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+dash_app = Dash(__name__, external_stylesheets=external_stylesheets)
+
 
 dash_app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
     dcc.Graph(
-        id='example-graph',
-        figure=rba_set.current_symbol_figure
+        id='ohlcv-graph',
+        figure=app_dict['dpic']
     ),
         dcc.Input(
         id='directory',
@@ -102,8 +73,8 @@ def getStartAndEndRange(relayoutData): #not sure if needed. probably merge into 
     
 
 # @dash_app.callback(
-#     dash.dependencies.Output('example-graph', 'figure'),
-#     [dash.dependencies.Input('example-graph', 'relayoutData'),
+#     dash.dependencies.Output('ohlcv-graph', 'figure'),
+#     [dash.dependencies.Input('ohlcv-graph', 'relayoutData'),
 #      dash.dependencies.Input('reload-button', 'n_clicks')]
 #     )
 # def update_graph(relayoutData, n_clicks):
