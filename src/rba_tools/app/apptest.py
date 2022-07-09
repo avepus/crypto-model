@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from dataclasses import dataclass,field
 from rba_tools.backtest.backtrader_extensions.plotting.plotinfo import unpickle_last_dpic,DataAndPlotInfoContainer
 import rba_tools.backtest.backtrader_extensions.plotting.plot as rbsplot
+import rba_tools.constants as constants
 
 @dataclass
 class AppInfo:
@@ -24,7 +25,7 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 
-app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
+app.layout = html.Div(style={'backgroundColor': constants.COLORS['background']}, children=[
     dcc.Graph(id='ohlcv-graph'),
     html.Button('Reload Graph', id='reload-button'),
     # ,
@@ -80,16 +81,7 @@ def getStartAndEndRange(relayoutData): #not sure if needed. probably merge into 
 def update_graph(relayoutData, n_clicks):
     (start_range, end_range) = getStartAndEndRange(relayoutData)
     
-    df = app_info.dpic.data_and_plots_list[0].df
-
-    if start_range is None:
-        start_range = df.index[0]
-        end_range = df.index[len(df.index) - 1]
-    
-    rangeMin = df.loc[start_range:end_range, 'Low'].values.min()
-    rangeMax = df.loc[start_range:end_range, 'High'].values.max()
-    
-    return rbsplot.get_candlestick_plot_from_dpi(app_info.dpic.data_and_plots_list[0])
+    return rbsplot.get_candlestick_plot_from_dpi(app_info.dpic.data_and_plots_list[0], start_range, end_range)
     return {
             'data': [
                 {'type': 'candlestick',

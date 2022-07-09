@@ -78,19 +78,24 @@ def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotIn
                       marker=line_plot_info.markers,
                       name=name)
 
+def get_candlestick_plot_title_from_dpi(dpi: pi.DataPlotInfo):
+    return dpi.symbol + ' (' + dpi.timeframe + ')'
 
-
-def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo, start: Optional[datetime], end: Optional[datetime]):
+def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo, start: Optional[datetime] = None, end: Optional[datetime] = None):
     """Creates a candle stick plot from a DataPlotInfo"""
-    title = dpi.symbol + ' (' + dpi.timeframe + ')'
-    if start:
-        #left off here. replicate logic from update_graph in apptest
+    title = get_candlestick_plot_title_from_dpi(dpi)
+    start = start if start is not None else dpi.df.index[0]
+    end = end if end is not None else dpi.df.index[-1]
+    range_min = dpi.df.loc[start:end, 'Low'].values.min()
+    range_max = dpi.df.loc[start:end, 'High'].values.max()
     fig = go.Figure(layout = {'title': title,
                                'showlegend': True,
                                'plot_bgcolor': constants.COLORS['background'],
                                'paper_bgcolor': constants.COLORS['background'],
                                'xaxis' : {'rangeslider': {'visible': False},
-                                          'autorange': True}
+                                          'autorange': False,
+                                          'range' : [start, end]},
+                               'yaxis': {'range' : [range_min, range_max]}
                              })
     fig.add_trace(get_candlestick_plot_from_df(dpi.df, dpi.symbol))
 
