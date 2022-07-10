@@ -8,15 +8,14 @@ Created on Sunday 1/22/22
 """
 
 from dash import dcc, html, Dash, dependencies
-import plotly.graph_objects as go
 from dataclasses import dataclass,field
-from rba_tools.backtest.backtrader_extensions.plotting.plotinfo import unpickle_last_dpic,DataAndPlotInfoContainer
+from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer,unpickle_last_dpic
 import rba_tools.backtest.backtrader_extensions.plotting.plot as rbsplot
 import rba_tools.constants as constants
 
 @dataclass
 class AppInfo:
-    dpic: DataAndPlotInfoContainer = field(default=unpickle_last_dpic())
+    dpic: DataPlotInfoContainer = field(default=unpickle_last_dpic())
 
 app_info = AppInfo()
 
@@ -82,28 +81,6 @@ def update_graph(relayoutData, n_clicks):
     (start_range, end_range) = getStartAndEndRange(relayoutData)
     
     return rbsplot.get_candlestick_plot_from_dpi(app_info.dpic.data_and_plots_list[0], start_range, end_range)
-    return {
-            'data': [
-                {'type': 'candlestick',
-                  'open' : df['Open'],
-                  'high' : df['High'],
-                  'low' : df['Low'],
-                  'close' : df['Close'],
-                  'x' : df.index,
-                  'name' : app_info.dpic.strategy}
-                ],
-            'layout': {
-                'title': app_info.dpic.strategy,
-                'plot_bgcolor': colors['background'],
-                'paper_bgcolor': colors['background'],
-                'yaxis' : {'range' : [rangeMin, rangeMax]},
-                'xaxis' : {'range' : [start_range, end_range],
-                           'rangeslider': {'visible': False}},
-                'font': {
-                    'color': colors['text']
-                    }
-            }
-        }
 
 # @app.callback(
 #     dash.dependencies.Output('symbol-dropdown', 'options'),

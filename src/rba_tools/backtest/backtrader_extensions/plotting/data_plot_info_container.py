@@ -1,18 +1,17 @@
-from typing import Type, Optional, Union, List
+from typing import Union, Optional, List, Type
 import pickle
 import os
 from fnmatch import fnmatch
-from datetime import datetime
-from collections import defaultdict, OrderedDict
-from dataclasses import field, dataclass
-import backtrader as bt
-from pandas import DataFrame
+from dataclasses import dataclass
+from collections import defaultdict
 import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-from backtrader.utils import num2date
+from pandas import DataFrame, Series
+import backtrader as bt
+from datetime import datetime
 from rba_tools.constants import get_pickle_root
-
+from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info import DataPlotInfo
+from rba_tools.backtest.backtrader_extensions.plotting.indicator_plot_info import IndicatorPlotInfo
+from rba_tools.backtest.backtrader_extensions.plotting.line_plot_info import LinePlotInfo
 
 
 GLOBAL_TOP = 'global_top'
@@ -21,86 +20,8 @@ LOWER = 'lower'
 OVERLAY = 'overlay'
 
 
-MATPLOTLIB_TO_PLOTLY_MARKER_MAP = {
-    '^' : 'triangle-up',
-    'v' : 'triangle-down',
-    'o' : 'circle-dot'
-}
-
-MATPLOTLIB_TO_PLOTLY_COLOR_MAP = {
-    'g' : 'green',
-    'lime' : 'green'
-}
-
-
-def main_test():
-    print(get_pickle_root())
-
-
 @dataclass
-class LinePlotInfo():
-    """holds line level plot info which consists of the
-    name of the line and the plotinfo dictionary variables
-    used to determine how to plot the line.
-    
-    This is the individual line level of the plotting"""
-    line_name: str
-    plotinfo: dict
-    overlay: bool = field(default=False)
-    mode: str = field(default=None)
-    markers: dict = field(init=False)
-
-    def __post_init__(self):
-        if isinstance(self.plotinfo, OrderedDict):
-            self.plotinfo = dict(self.plotinfo)
-        self.markers = get_marker_dict(self.plotinfo)
-
-
-def get_marker_dict(plotinfo):
-    """obtains the dictionary to passed into go.Scatter(... , marker=thisReturnValue)"""
-    ret_dict = {}
-    if plotinfo.get('color'):
-        ret_dict['color'] = plotinfo.get('color')
-        if MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color']):
-            ret_dict['color'] = MATPLOTLIB_TO_PLOTLY_COLOR_MAP.get(ret_dict['color'])
-    
-    if plotinfo.get('markersize'):
-        ret_dict['size'] = plotinfo.get('markersize')
-
-    if MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker')):
-        ret_dict['symbol'] = MATPLOTLIB_TO_PLOTLY_MARKER_MAP.get(plotinfo.get('marker'))
-
-    return ret_dict
-
-def pandas_series_is_continuous(series: pd.Series) -> bool:
-    """returns True if a series contains nan.
-    Ignores the first nan values up to the first valid value and
-    all nan values from the last valid value to the end"""
-    series_first_valid_to_last_valid = series.loc[series.first_valid_index(): series.last_valid_index()]
-    return len(series_first_valid_to_last_valid) == len(series_first_valid_to_last_valid.dropna())
-
-@dataclass
-class IndicatorPlotInfo():
-    """holds indicator level plot info which consists of the
-    name of the indicator and a list of LinePlotInfo objects.
-    This is the "figure" level of the plotting"""
-    name: str
-    line_list: List[LinePlotInfo]
-
-
-@dataclass
-class DataPlotInfo():
-    """Holds the actual data from the cerebro run in a dataframe
-    as well as the list of the IndicatorPlotInfo objects from that run
-    This is the "timeframe" level of reporting"""
-    df: DataFrame
-    symbol: str
-    timeframe: str
-    indicator_list: List[IndicatorPlotInfo]
-
-
-@dataclass
-class DataAndPlotInfoContainer():
+class DataPlotInfoContainer():
     """Class holds a list of DataPlotInfo objects
     This is the "Strategy" level of reporting
 
@@ -118,9 +39,9 @@ class DataAndPlotInfoContainer():
             self.strategy = type(self.strategy).__name__
 
 
-def pickle_dpic(dpic: DataAndPlotInfoContainer):
+def pickle_dpic(dpic: DataPlotInfoContainer):
     """Creates pickle file for DataAndPlotInfoContainer"""
-    def get_file_name(dpic: DataAndPlotInfoContainer) -> str:
+    def get_file_name(dpic: DataPlotInfoContainer) -> str:
         symbol = dpic.data_and_plots_list[0].symbol.replace('/','-')
         return datetime.now().strftime("%Y-%m-%d %H;%M;%S") + '_' + dpic.strategy + '_' + symbol + '.p'
 
@@ -129,7 +50,7 @@ def pickle_dpic(dpic: DataAndPlotInfoContainer):
     with open(path, 'wb') as file:
         pickle.dump(dpic, file)
 
-def unpickle_last_dpic() -> DataAndPlotInfoContainer:
+def unpickle_last_dpic() -> DataPlotInfoContainer:
     """Unpickles the most recently pickled DataAndPlotInfoContainer class"""
     pickle_dir_list = os.listdir(get_pickle_root())
     dpic_pickle_list = [f for f in pickle_dir_list if fnmatch(f, '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.p')]
@@ -137,12 +58,6 @@ def unpickle_last_dpic() -> DataAndPlotInfoContainer:
     path = os.path.join(get_pickle_root(), dpic_pickle_list[0])
     with open(path, 'rb') as file:
         return pickle.load(file)
-
-
-
-    
-        
-
 
 
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
@@ -172,7 +87,7 @@ def get_ohlcv_data_from_data(data):
     start = 0
     end = len(data)
     datetime_float_ary = data.datetime.plot()
-    datetime_list = [num2date(float_date) for float_date in datetime_float_ary]
+    datetime_list = [bt.utils.num2date(float_date) for float_date in datetime_float_ary]
     index = np.array(datetime_list)
     return DataFrame(data={
         'Open' : data.open.plotrange(start,end),
@@ -283,10 +198,24 @@ def get_symbol_from_bt_datafeed(data):
     symbol = None
     try:
         symbol = data._dataname['Symbol'].iat[0]
-    except:
+    except (KeyError, TypeError, AttributeError):
         pass
     return symbol
 
+def pandas_series_is_continuous(series: Series) -> bool:
+    """returns True if a series contains nan.
+    Ignores the first nan values up to the first valid value and
+    all nan values from the last valid value to the end"""
+    series_first_valid_to_last_valid = series.loc[series.first_valid_index(): series.last_valid_index()]
+    return len(series_first_valid_to_last_valid) == len(series_first_valid_to_last_valid.dropna())
+
+def get_timeframe_name_from_bt_datafeed(data):
+    """Gets timeframe name. Copied straight from backtrader.plot"""
+    tfname = ''
+    if hasattr(data, '_compression') and \
+        hasattr(data, '_timeframe'):
+        tfname = bt.TimeFrame.getname(data._timeframe, data._compression)
+    return tfname
 
 def sort_indicators(strategy: bt.Strategy):
     """Copy of bt.plot.Plot.sortdataindicators returned in a dictionary.
@@ -351,47 +280,3 @@ def sort_indicators(strategy: bt.Strategy):
             plot_dictionary[OVERLAY][key].append(indicator)
 
     return plot_dictionary
-
-
-
-#unsure if tags below are needed
-
-def get_candlestick_name_from_bt_datafeed(data):
-    """Creates formatted name of symbol and timeframe for charts"""
-    symbol = get_symbol_from_bt_datafeed(data)
-    timeframe_name = get_timeframe_name_from_bt_datafeed(data)
-    return symbol + ' ' + timeframe_name
-
-def get_candlestick_figure(data):
-    """get a candlestick figure from a datafeed"""
-    fig = go.Figure(layout = {'title': get_candlestick_name_from_bt_datafeed(data),
-            'xaxis' : {'rangeslider': {'visible': False},
-                        'autorange': True}
-            })
-    df = get_ohlcv_data_from_data(data)
-    fig.add_trace(get_candlestick_plot(df))
-    return fig
-
-def get_candlestick_plot(df: DataFrame):
-    #returns a candlestick plot from a dataframe with Open, High, Low, and Close columns
-    return go.Candlestick(x=df.index,
-            open=df['Open'],
-            high=df['High'],
-            low=df['Low'],
-            close=df['Close'])
-
-def get_timeframe_name_from_bt_datafeed(data):
-    """Gets timeframe name. Copied straight from backtrader.plot"""
-    tfname = ''
-    if hasattr(data, '_compression') and \
-        hasattr(data, '_timeframe'):
-        tfname = bt.TimeFrame.getname(data._timeframe, data._compression)
-    return tfname
-
-def get_datetime(strategy):
-    datetime_series = pd.Series(strategy.datetime.plot())
-    datetime_array = datetime_series.map(num2date)
-    return pd.to_datetime(datetime_array)
-
-if __name__ == '__main__':
-    main_test()

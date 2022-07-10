@@ -1,17 +1,16 @@
-from collections import defaultdict
-from typing import Optional, OrderedDict, Type
-from dataclasses import dataclass,field
+from typing import Optional
 import backtrader as bt
 from datetime import datetime
 import plotly.graph_objects as go
-from backtrader.utils import num2date
 import pandas as pd
-import numpy as np
 import rba_tools.constants as constants
 
 from rba_tools.retriever.get_crypto_data import DataPuller
 import rba_tools.backtest.backtrader_extensions.strategies as rbsstrat
-import rba_tools.backtest.backtrader_extensions.plotting.plotinfo as pi
+from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer
+from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info import DataPlotInfo
+from rba_tools.backtest.backtrader_extensions.plotting.indicator_plot_info import IndicatorPlotInfo
+from rba_tools.backtest.backtrader_extensions.plotting.line_plot_info import LinePlotInfo
 
 
 
@@ -47,7 +46,9 @@ def main():
     #DataAndPlotInfoContainer(back[0])
 
 
-def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
+#Indicator Plotting:
+
+def plot_indicator(df: pd.DataFrame, indicator_plot_info: IndicatorPlotInfo):
     """plots an indicator given the associated DataFrame and plot info"""
     fig = go.Figure(layout = {'title': indicator_plot_info.name,
                                'showlegend': True})
@@ -56,7 +57,7 @@ def plot_indicator(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
         fig.add_trace(plot)
     return fig
 
-def get_indicator_plot_list(df: pd.DataFrame, indicator_plot_info: pi.IndicatorPlotInfo):
+def get_indicator_plot_list(df: pd.DataFrame, indicator_plot_info: IndicatorPlotInfo):
     """get list of indicator plots"""
     plot_list = []
     for line_plot_info in indicator_plot_info.line_list:
@@ -69,7 +70,10 @@ def truncate_str_to_max_chars(string: str):
     return string[0:18] + '..'
 
 
-def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotInfo):
+
+#LinePlotInfo Plotting:
+
+def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: LinePlotInfo):
     """creates a plot for a single line of an indicator"""
     name = truncate_str_to_max_chars(line_plot_info.line_name)
     return go.Scatter(x=df.index,
@@ -78,10 +82,14 @@ def get_plot_from_line_plot_info(df: pd.DataFrame, line_plot_info: pi.LinePlotIn
                       marker=line_plot_info.markers,
                       name=name)
 
-def get_candlestick_plot_title_from_dpi(dpi: pi.DataPlotInfo):
+
+
+#DataPlotInfo Plotting
+
+def get_candlestick_plot_title_from_dpi(dpi: DataPlotInfo):
     return dpi.symbol + ' (' + dpi.timeframe + ')'
 
-def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo, start: Optional[datetime] = None, end: Optional[datetime] = None):
+def get_candlestick_plot_from_dpi(dpi: DataPlotInfo, start: Optional[datetime] = None, end: Optional[datetime] = None):
     """Creates a candle stick plot from a DataPlotInfo"""
     title = get_candlestick_plot_title_from_dpi(dpi)
     start = start if start is not None else dpi.df.index[0]
@@ -103,7 +111,8 @@ def get_candlestick_plot_from_dpi(dpi: pi.DataPlotInfo, start: Optional[datetime
         fig.add_trace(plt)
     return fig
 
-def get_overlay_plot_list_from_indicator(df: pd.DataFrame, indicator: pi.IndicatorPlotInfo):
+
+def get_overlay_plot_list_from_indicator(df: pd.DataFrame, indicator: IndicatorPlotInfo):
     """get list of plots marked overlay from IndicatorPlotInfo"""
     plot_list = []
     for line_info in indicator.line_list:
@@ -111,7 +120,8 @@ def get_overlay_plot_list_from_indicator(df: pd.DataFrame, indicator: pi.Indicat
             plot_list.append(get_plot_from_line_plot_info(df, line_info))
     return plot_list
 
-def get_overlay_plot_list_from_dpi(dpi: pi.DataPlotInfo):
+
+def get_overlay_plot_list_from_dpi(dpi: DataPlotInfo):
     """get list of plots marked overlay from DataPlotInfo"""
     plot_list = []
     for ind in dpi.indicator_list:
@@ -128,6 +138,14 @@ def get_candlestick_plot_from_df(df: pd.DataFrame, symbol: str):
             close=df['Close'],
             name=symbol)
 
+
+#DataPlotInfoContainerPlotting
+
+def get_data_plot_info_container_plot_list(dpic: DataPlotInfoContainer):
+    """gets list of plots for a DataPlotInfoContainer"""
+    plot_list = []
+    
+    return plot_list
 
 if __name__ == '__main__':
     main()
