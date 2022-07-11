@@ -1,4 +1,4 @@
-from typing import List
+from typing import List,Optional
 from dataclasses import dataclass
 from rba_tools.backtest.backtrader_extensions.plotting.line_plot_info import LinePlotInfo
 
@@ -15,3 +15,4 @@ class IndicatorPlotInfo():
     This is the "figure" level of the plotting"""
     name: str
     line_list: List[LinePlotInfo]
+    overlay: Optional[bool] = False

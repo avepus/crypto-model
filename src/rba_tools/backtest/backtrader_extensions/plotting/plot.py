@@ -48,10 +48,17 @@ def main():
 
 #Indicator Plotting:
 
-def plot_indicator(df: pd.DataFrame, indicator_plot_info: IndicatorPlotInfo):
+def plot_indicator(df: pd.DataFrame, indicator_plot_info: IndicatorPlotInfo, start: Optional[datetime] = None, end: Optional[datetime] = None):
     """plots an indicator given the associated DataFrame and plot info"""
+    start = start if start is not None else df.index[0]
+    end = end if end is not None else df.index[-1]
     fig = go.Figure(layout = {'title': indicator_plot_info.name,
-                               'showlegend': True})
+                               'showlegend': True,
+                               'xaxis' : {'rangeslider': {'visible': False},
+                                          'autorange': False,
+                                          'range' : [start, end]}
+                               #could implement y-axis scaling
+                                          })
     plot_list = get_indicator_plot_list(df, indicator_plot_info)
     for plot in plot_list:
         fig.add_trace(plot)
@@ -141,10 +148,19 @@ def get_candlestick_plot_from_df(df: pd.DataFrame, symbol: str):
 
 #DataPlotInfoContainerPlotting
 
-def get_data_plot_info_container_plot_list(dpic: DataPlotInfoContainer):
+def get_data_plot_info_container_plot_list(dpic: DataPlotInfoContainer, start: Optional[datetime] = None, end: Optional[datetime] = None):
     """gets list of plots for a DataPlotInfoContainer"""
     plot_list = []
     
+    for dpi in dpic.data_and_plots_list:
+        dpi_start = start if start is not None else dpi.df.index[0]
+        dpi_end = end if end is not None else dpi.df.index[-1]
+        plot_list.append(get_candlestick_plot_from_dpi(dpi, dpi_start, dpi_end))
+        for ind in dpi.indicator_list:
+            if ind.overlay:
+                continue
+            plot_list.append(plot_indicator(dpi.df, ind, dpi_start, dpi_end))
+
     return plot_list
 
 if __name__ == '__main__':

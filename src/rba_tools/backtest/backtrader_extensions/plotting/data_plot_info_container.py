@@ -153,7 +153,7 @@ def add_indicator_to_df_and_figure(df: DataFrame, indicator: bt.indicator, overl
         mode = None if pandas_series_is_continuous(df[name]) else 'markers'
         lpi_list.append(LinePlotInfo(name, plotinfo, overlay, mode))
 
-    return IndicatorPlotInfo(type(indicator).__name__, lpi_list)
+    return IndicatorPlotInfo(type(indicator).__name__, lpi_list, overlay)
 
 
 def get_indicator_line_name(indicator: bt.indicator, index=0):
