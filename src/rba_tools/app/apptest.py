@@ -9,6 +9,7 @@ Created on Sunday 1/22/22
 
 from dash import dcc, html, Dash, dependencies
 from dataclasses import dataclass,field
+import plotly.graph_objects as go
 from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer,unpickle_last_dpic
 import rba_tools.backtest.backtrader_extensions.plotting.plot as rbsplot
 import rba_tools.constants as constants
@@ -27,6 +28,7 @@ app = Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div(style={'backgroundColor': constants.COLORS['background']}, children=[
     dcc.Graph(id='ohlcv-graph'),
     html.Button('Reload Graph', id='reload-button'),
+    html.Div(id='div_variable')
     # ,
     #     dcc.Input(
     #     id='directory',
@@ -73,14 +75,22 @@ def getStartAndEndRange(relayoutData): #not sure if needed. probably merge into 
     
 
 @app.callback(
-    dependencies.Output('ohlcv-graph', 'figure'),
+    [dependencies.Output('ohlcv-graph', 'figure'),
+    dependencies.Output('div_variable', 'children')],
     [dependencies.Input('ohlcv-graph', 'relayoutData'),
      dependencies.Input('reload-button', 'n_clicks')]
     )
 def update_graph(relayoutData, n_clicks):
     (start_range, end_range) = getStartAndEndRange(relayoutData)
-    
-    return rbsplot.get_candlestick_plot_from_dpi(app_info.dpic.data_and_plots_list[0], start_range, end_range)
+
+    dpic_fig_list = rbsplot.get_data_plot_info_container_plot_list(app_info.dpic, start_range, end_range)
+
+    candlestick_fig = dpic_fig_list.pop(0)
+
+    ind_plot_list = [dcc.Graph(id=f'graph{i}', figure=dpic_fig_list[i]) for i in range(len(dpic_fig_list))]
+
+    return [candlestick_fig,
+            ind_plot_list]
 
 # @app.callback(
 #     dash.dependencies.Output('symbol-dropdown', 'options'),
