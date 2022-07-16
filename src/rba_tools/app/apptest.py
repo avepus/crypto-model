@@ -87,7 +87,7 @@ def update_graph(relayoutData, n_clicks):
 
     candlestick_fig = dpic_fig_list.pop(0)
 
-    ind_plot_list = [dcc.Graph(id=f'graph{i}', figure=dpic_fig_list[i]) for i in range(len(dpic_fig_list))]
+    ind_plot_list = [dcc.Graph(id='graph' + str(i), figure=dpic_fig_list[i]) for i in range(len(dpic_fig_list))]
 
     return [candlestick_fig,
             ind_plot_list]

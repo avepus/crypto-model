@@ -157,11 +157,22 @@ def get_data_plot_info_container_plot_list(dpic: DataPlotInfoContainer, start: O
         dpi_end = end if end is not None else dpi.df.index[-1]
         plot_list.append(get_candlestick_plot_from_dpi(dpi, dpi_start, dpi_end))
         for ind in dpi.indicator_list:
-            if ind.overlay:
+            if ind.overlay or not indicator_has_values(dpi.df, ind):
                 continue
             plot_list.append(plot_indicator(dpi.df, ind, dpi_start, dpi_end))
 
     return plot_list
+
+def indicator_has_values(df: pd.DataFrame, indicator_plot_info: IndicatorPlotInfo) -> bool:
+    """returns False if every value of every line of an indicator is nan. Otherwise True"""
+    all_nan = True
+    for line in indicator_plot_info.line_list:
+        all_nan = not df[line.line_name].isnull().all()
+        if all_nan:
+            break
+    return all_nan
+
+
 
 if __name__ == '__main__':
     main()
