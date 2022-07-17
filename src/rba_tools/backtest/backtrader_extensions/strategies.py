@@ -96,6 +96,27 @@ class TestMultStrategy(bt.Strategy):
             if self.sell_signal:
                 self.close()
 
+
+class TestMultStrategy2(bt.Strategy):
+
+    def __init__(self):
+        self.test = test = rbsind.TestInd(self.data1)
+        #pp.plotinfo.plot = False  # deactivate plotting
+
+        test1 = test()  # couple the entire indicators
+        self.sell_signal = test1 < self.data0.close
+        self.buy_signal = test1 > self.data0.close
+
+    def next(self):
+        # Check if we are in the market
+        if not self.position:
+            if self.buy_signal:
+                self.buy()
+        else:
+            #if there is no trend then close
+            if self.sell_signal:
+                self.close()
+
 class TestStrategy(bt.Strategy):
 
     params = (
@@ -111,9 +132,9 @@ class TestStrategy(bt.Strategy):
         #self.lowhigh = rbsind.LowHighRatio(self.data, period=self.p.period, threshold=self.p.threshold)
         #self.con_bars = rbsind.TrendInfo(self.data)
         self.in_trend = in_trend = rbsind.InTrend(self.data1)
-        self.retrace_percent = rbsind.Retrace_Percent(self.data1)
-        self.trend_high = rbsind.Trend_High(self.data1)
-        self.trend_open = rbsind.Trend_Open(self.data1)
+        #self.retrace_percent = rbsind.Retrace_Percent(self.data1)
+        #self.trend_high = rbsind.Trend_High(self.data1)
+        #self.trend_open = rbsind.Trend_Open(self.data1)
 
         in_trend1 = in_trend()
         self.buy_signal = in_trend1.trend_retrace < 50
@@ -194,10 +215,10 @@ class TestStrategy(bt.Strategy):
             if self.buy_signal:
                 o1 = self.buy()
                 #self.log('o1=' + str(o1))
-                o2 = self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
+                #o2 = self.sell(exectype=bt.Order.Limit, price=self.in_trend.trend_high[0])
                 #self.log('o2=' + str(o2))
-                stopLoss = self.data.close[0] * (1 - (self.p.max_drawdown_pct / 100))
-                o3 = self.sell(price=stopLoss,exectype=bt.Order.Stop, oco=o2)
+                #stopLoss = self.data.close[0] * (1 - (self.p.max_drawdown_pct / 100))
+                #o3 = self.sell(price=stopLoss,exectype=bt.Order.Stop, oco=o2)
                 #self.log('o3=' + str(o3))
         else:
             #if there is no trend then close

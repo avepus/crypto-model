@@ -83,7 +83,7 @@ class InTrend(bt.Indicator):
     trend_high - high of the trend
     """
 
-    params = (('minimum_bars',2),('maximum_bars',20),('minimum_move_percent',10),('trend_retrace_percent',85),)
+    params = (('minimum_bars',2),('maximum_bars',20),('minimum_move_percent',20),('trend_retrace_percent',85),)
 
     lines = ('consec_bars', 'trend_started_ago', 'trend_high', 'trend_retrace', 'trend_open')
 

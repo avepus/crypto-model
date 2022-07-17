@@ -13,13 +13,15 @@ import plotly.graph_objects as go
 from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer,unpickle_last_dpic,get_last_dpic_file_name,get_pickle_file_list,unpickle_dpic
 import rba_tools.backtest.backtrader_extensions.plotting.plot as rbsplot
 import rba_tools.constants as constants
+import rba_tools.backtest.backtrader_extensions.runs as runs
 
 @dataclass
 class AppInfo:
     dpic: DataPlotInfoContainer = field(default=unpickle_last_dpic())
-    file: str = field(default=get_last_dpic_file_name())
+    file: str = field(default_factory=get_last_dpic_file_name)
 
-app_info = AppInfo()
+#app_info = AppInfo()  #use this to load the last saved run
+app_info = AppInfo(runs.run_multiple_timeframe(save=True)) #use this to do a new run
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
