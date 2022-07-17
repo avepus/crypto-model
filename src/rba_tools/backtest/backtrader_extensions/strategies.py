@@ -75,7 +75,26 @@ class ConsecutiveBarsTesttSecondData(bt.Strategy):
             if not self.buy_signal:
                 self.close()
 
-        
+
+class TestMultStrategy(bt.Strategy):
+
+    def __init__(self):
+        self.pp = pp = bt.ind.PivotPoint(self.data1)
+        #pp.plotinfo.plot = False  # deactivate plotting
+
+        pp1 = pp()  # couple the entire indicators
+        self.sell_signal = self.data0.close < pp1.s1
+        self.buy_signal = self.data0.close > pp1.s1
+
+    def next(self):
+        # Check if we are in the market
+        if not self.position:
+            if self.buy_signal:
+                self.buy()
+        else:
+            #if there is no trend then close
+            if self.sell_signal:
+                self.close()
 
 class TestStrategy(bt.Strategy):
 
@@ -98,7 +117,7 @@ class TestStrategy(bt.Strategy):
 
         in_trend1 = in_trend()
         self.buy_signal = in_trend1.trend_retrace < 50
-        self.sell_signal = isnan(in_trend1.trend_retrace)
+        self.sell_signal = in_trend1.trend_retrace > 50 #isnan(in_trend1.trend_retrace)
 
         if self.params.debug:
             open('run_log.txt', 'w').close() #clear out file at during init if we're writing to file

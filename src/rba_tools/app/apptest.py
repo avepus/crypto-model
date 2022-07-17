@@ -10,13 +10,14 @@ Created on Sunday 1/22/22
 from dash import dcc, html, Dash, dependencies
 from dataclasses import dataclass,field
 import plotly.graph_objects as go
-from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer,unpickle_last_dpic
+from rba_tools.backtest.backtrader_extensions.plotting.data_plot_info_container import DataPlotInfoContainer,unpickle_last_dpic,get_last_dpic_file_name,get_pickle_file_list,unpickle_dpic
 import rba_tools.backtest.backtrader_extensions.plotting.plot as rbsplot
 import rba_tools.constants as constants
 
 @dataclass
 class AppInfo:
     dpic: DataPlotInfoContainer = field(default=unpickle_last_dpic())
+    file: str = field(default=get_last_dpic_file_name())
 
 app_info = AppInfo()
 
@@ -26,23 +27,19 @@ app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 
 app.layout = html.Div(style={'backgroundColor': constants.COLORS['background']}, children=[
-    dcc.Graph(id='ohlcv-graph'),
-    html.Button('Reload Graph', id='reload-button'),
-    html.Div(id='div_variable')
-    # ,
-    #     dcc.Input(
+    # dcc.Input(
     #     id='directory',
     #     type='text',
-    #     placeholder=rba_set.symbol_list[rba_set.current_symbol_index],
-    #     value=rba_set.symbol_list[rba_set.current_symbol_index],
+    #     placeholder=app_info.file,
+    #     value=app_info.file,
     #     debounce=True,
     #     size='70'
     #     ),
-    # html.Button('Reload Graph', id='reload-button'),
-    # dcc.Dropdown(
-    #     id='symbol-dropdown',
-    #     value=rba_set.symbol_list[rba_set.current_symbol_index]
-    #     ),
+    dcc.Dropdown(get_pickle_file_list(), app_info.file, id='file-dropdown'),
+    dcc.Graph(id='ohlcv-graph'),
+    html.Button('Reload Graph', id='reload-button'),
+    html.Div(id='div_variable')
+    ,
     # html.Div(id='output-container-button',
     #          children='Enter a value and press submit',
     #          style={'color': colors['text']}),
@@ -50,7 +47,7 @@ app.layout = html.Div(style={'backgroundColor': constants.COLORS['background']},
         
 
 
-def trimDatetime(d): #not sure if needed
+def trimDatetime(d): #not sure if neede
     loc = d.find('.')
     if loc == -1:
         return d
@@ -78,10 +75,15 @@ def getStartAndEndRange(relayoutData): #not sure if needed. probably merge into 
     [dependencies.Output('ohlcv-graph', 'figure'),
     dependencies.Output('div_variable', 'children')],
     [dependencies.Input('ohlcv-graph', 'relayoutData'),
-     dependencies.Input('reload-button', 'n_clicks')]
+     dependencies.Input('reload-button', 'n_clicks'),
+     dependencies.Input('file-dropdown', 'value')]
     )
-def update_graph(relayoutData, n_clicks):
+def update_graph(relayoutData, n_clicks, value):
     (start_range, end_range) = getStartAndEndRange(relayoutData)
+
+    if not value == app_info.file:
+        app_info.file = value
+        app_info.dpic = unpickle_dpic(value)
 
     dpic_fig_list = rbsplot.get_data_plot_info_container_plot_list(app_info.dpic, start_range, end_range)
 
@@ -91,16 +93,6 @@ def update_graph(relayoutData, n_clicks):
 
     return [candlestick_fig,
             ind_plot_list]
-
-# @app.callback(
-#     dash.dependencies.Output('symbol-dropdown', 'options'),
-#     [dash.dependencies.Input("directory", "value")],
-# )
-# def fileList(directory):
-#     try:
-#         return [{'label': symbol, 'value': rba_set.symbol_list.index(symbol)} for symbol in rba_set.symbol_list]
-#     except:
-#         return [{'label': "<No Symbols Found>", 'value': 0}]
 
 # @app.callback(
 #     dash.dependencies.Output('output-container-button', 'children'),

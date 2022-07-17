@@ -52,12 +52,26 @@ def pickle_dpic(dpic: DataPlotInfoContainer):
 
 def unpickle_last_dpic() -> DataPlotInfoContainer:
     """Unpickles the most recently pickled DataAndPlotInfoContainer class"""
-    pickle_dir_list = os.listdir(get_pickle_root())
-    dpic_pickle_list = [f for f in pickle_dir_list if fnmatch(f, '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.p')]
-    dpic_pickle_list.sort(reverse = True)
-    path = os.path.join(get_pickle_root(), dpic_pickle_list[0])
-    with open(path, 'rb') as file:
+    path = get_last_dpic_file_name()
+    return unpickle_dpic(path)
+    
+
+def unpickle_dpic(file_name) -> DataPlotInfoContainer:
+    """unpickles a DataAndPlotInfoContainer from a file in pickle dir"""
+    abs_path = os.path.join(get_pickle_root(), file_name)
+    with open(abs_path, 'rb') as file:
         return pickle.load(file)
+
+def get_last_dpic_file_name() -> str:
+    """gets the latest pickle file based on file name"""
+    dpic_pickle_list = get_pickle_file_list()
+    dpic_pickle_list.sort(reverse = True)
+    return dpic_pickle_list[0]
+
+def get_pickle_file_list() -> List[str]:
+    """get's list of all pickle files"""
+    pickle_dir_list = os.listdir(get_pickle_root())
+    return [f for f in pickle_dir_list if fnmatch(f, '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.p')]
 
 
 def get_dataframe_and_plot_dict(strategy: Type[bt.Strategy]):
