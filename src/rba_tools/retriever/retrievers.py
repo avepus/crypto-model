@@ -133,7 +133,7 @@ class KrakenOHLCVTZipRetriever(OHLCVDataRetriever):
         if not self.kraken_file:
             self.kraken_file = os.path.join(str(Path(__file__).parent), 'ohlcv_data', 'Kraken_OHLCVT.zip')
         if not Path(self.kraken_file).is_file():
-            raise KrakenFileNotFoundError
+            raise KrakenFileNotFoundError(self.kraken_file)
         
 
     def fetch_ohlcv(self, symbol: str, timeframe: Timeframe, from_date: datetime, to_date: datetime) -> pd.DataFrame:
