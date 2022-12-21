@@ -66,7 +66,9 @@ def get_last_dpic_file_name() -> str:
     """gets the latest pickle file based on file name"""
     dpic_pickle_list = get_pickle_file_list()
     dpic_pickle_list.sort(reverse = True)
-    return dpic_pickle_list[0]
+    if dpic_pickle_list:
+        return dpic_pickle_list[0]
+    return ''
 
 def get_pickle_file_list() -> List[str]:
     """get's list of all pickle files"""
